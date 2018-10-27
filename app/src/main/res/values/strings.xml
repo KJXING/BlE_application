@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">My Application</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_notifications">Notifications</string>
+
+    <string name="Title_inner_sensor">Inner Sensor</string>
+    <string name="Title_sensorTag">sensorTag</string>
+
+    <string name="Title_sensorTag_status_RFC">Ready for Configure</string>
+
+    <string name="x_Accelerometer">x_Acc:</string>
+    <string name="y_Accelerometer">y_Acc:</string>
+    <string name="z_Accelerometer">z_Acc:</string>
+
+    <string name="x_Gyroscope">x_Gyro:</string>
+    <string name="y_Gyroscope">y_Gyro:</string>
+    <string name="z_Gyroscope">z_Gyro:</string>
+
+    <string name="sensorTag_x_Gyroscope">x_Gyro:</string>
+    <string name="sensorTag_y_Gyroscope">y_Gyro:</string>
+    <string name="sensorTag_z_Gyroscope">z_Gyro:</string>
+
+    <string name="sensorTag_x_Accelerometer">x_Acc:</string>
+    <string name="sensorTag_y_Accelerometer">y_Acc:</string>
+    <string name="sensorTag_z_Accelerometer">z_Acc:</string>
+
+    <string name="sensorTag_x_Magnetometer">x_Mag:</string>
+    <string name="sensorTag_y_Magnetometer">y_Mag:</string>
+    <string name="sensorTag_z_Magnetometer">z_Mag:</string>
+
+    <string name="STATE_CONNECTED">STATE_CONNECTED</string>
+    <string name="STATE_CONNECTING">STATE_CONNECTING</string>
+    <string name="STATE_DISCONNECTED">STATE_DISCONNECTED</string>
+    <string name="STATE_DISCONNECTING">STATE_DISCONNECTING</string>
+</resources>

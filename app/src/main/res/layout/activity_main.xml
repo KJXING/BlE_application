@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<RelativeLayout android:id="@+id/container"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    tools:context=".MainActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_above="@id/navigation"
+        android:layout_alignParentTop="true">
+
+        <TextView
+            android:id="@+id/tv_title_top"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:gravity="center"
+            android:layout_gravity="center"
+            android:text="@string/title_home"/>
+
+        <LinearLayout
+            android:id="@+id/container_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+            <Button
+                android:id="@+id/btn_enableNotify"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Notify Off"/>
+            <Button
+                android:id="@+id/btn_enableSensor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sensor Off"/>
+            <Button
+                android:id="@+id/btn_readData"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Read data"/>
+
+        </LinearLayout>
+
+
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/x_acc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center"
+                    android:text="@string/x_Accelerometer"/>
+
+                <TextView
+                    android:id="@+id/y_acc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/y_Accelerometer"/>
+
+                <TextView
+                    android:id="@+id/z_acc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/z_Accelerometer"/>
+
+
+                <TextView
+                    android:id="@+id/x_gyro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/x_Gyroscope"/>
+
+                <TextView
+                    android:id="@+id/y_gyro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/y_Gyroscope"/>
+
+                <TextView
+                    android:id="@+id/z_gyro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/z_Gyroscope"/>
+                <TextView
+                    android:id="@+id/tv_title_sensorTag"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/Title_sensorTag"/>
+
+                <TextView
+                    android:id="@+id/sensorTag_x_acc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_x_Accelerometer"/>
+                <TextView
+                    android:id="@+id/sensorTag_y_acc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_y_Accelerometer"/>
+                <TextView
+                    android:id="@+id/sensorTag_z_acc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_y_Accelerometer"/>
+                <TextView
+                    android:id="@+id/sensorTag_x_Gyro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_x_Gyroscope"/>
+                <TextView
+                    android:id="@+id/sensorTag_y_Gyro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_y_Gyroscope"/>
+                <TextView
+                    android:id="@+id/sensorTag_z_Gyro"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_z_Gyroscope"/>
+
+                <TextView
+                    android:id="@+id/sensorTag_x_Mag"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_x_Magnetometer"/>
+
+                <TextView
+                    android:id="@+id/sensorTag_y_Mag"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_y_Magnetometer"/>
+
+                <TextView
+                    android:id="@+id/sensorTag_z_Mag"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginBottom="10dp"
+                    android:gravity="center"
+                    android:text="@string/sensorTag_z_Magnetometer"/>
+
+            </LinearLayout>
+        </ScrollView>
+
+
+        <ListView
+            android:id="@+id/LV_activtyMain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+        </ListView>
+
+    </LinearLayout>
+
+
+    <android.support.design.widget.BottomNavigationView
+        android:id="@+id/navigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/windowBackground"
+        app:menu="@menu/navigation"
+        android:layout_alignParentBottom="true"/>
+
+</RelativeLayout>
