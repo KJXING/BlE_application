@@ -84,7 +84,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView sensorTag_mag_y_TV;
     private TextView sensorTag_mag_z_TV;
 
-
+    private boolean switch_notify = true;
+    private boolean switch_sensor = true;
 
     private Button btnNotify;
     private Button btnEnableSensor;
@@ -183,8 +184,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnNotify.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                boolean result_enableNotification = enableNotification(mBluetoothGatt,mDescriptor);
-                if (result_enableNotification){
+                enableNotification(mBluetoothGatt,mDescriptor);
+                if (switch_notify){
                     btnNotify.setText("Notify On");
                 } else {
                     btnNotify.setText("Notify Off");
@@ -207,10 +208,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnReadData.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                boolean result_readCharacteristicValue = readCharacteristicValue(mBluetoothGatt,mentionCharacteristic);
-//                while (result_readCharacteristicValue){
-//                    result_readCharacteristicValue = readCharacteristicValue(mBluetoothGatt,mentionCharacteristic);
-//                }
+                readCharacteristicValue(mBluetoothGatt,mentionCharacteristic);
             }
         });
 
@@ -404,6 +402,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if (status == mBluetoothGatt.GATT_SUCCESS){
                 if (characteristic.getUuid().toString().equals(mentionCharacteristic.getUuid().toString() )){
                     sensorMpu9250AccConvert(characteristic);
+
+                    gatt.readCharacteristic(characteristic);
+
                     Log.d(tag,"onCharacteristicRead SUCCESS" );
                 } else {
                     Log.d(tag,"onCharacteristicRead was run but the status is not GATT SUCCESS " + status);
@@ -488,7 +489,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     //Run successfully
-    private boolean readCharacteristicValue(BluetoothGatt gatt,BluetoothGattCharacteristic characteristic){
+    private void readCharacteristicValue(BluetoothGatt gatt,BluetoothGattCharacteristic characteristic){
 
         boolean result = gatt.readCharacteristic(characteristic);
 
@@ -498,11 +499,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Log.d(tag,"readCharacteristic failure");
         }
 
-        return result;
+
 
     }
 
-    private boolean enableNotification(BluetoothGatt gatt, BluetoothGattDescriptor descriptor){
+    private void enableNotification(BluetoothGatt gatt, BluetoothGattDescriptor descriptor){
         boolean result = false;
         Log.d(tag,"enableNotification called");
 
@@ -521,11 +522,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Log.d(tag,"set enableNotification ENABLE_NOTIFICATION_VALUE value false");
         }
 
-        boolean WD_result = gatt.writeDescriptor(descriptor);
+        gatt.writeDescriptor(descriptor);
 
         Log.d(tag,"enableNotification has execute");
 
-        return WD_result;
+
     }
 
     private boolean enableMovement(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
