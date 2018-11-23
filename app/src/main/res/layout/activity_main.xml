@@ -27,7 +27,7 @@
             android:text="@string/title_home"/>
 
         <LinearLayout
-            android:id="@+id/container_btn"
+            android:id="@+id/container_btn_row1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -36,21 +36,45 @@
                 android:id="@+id/btn_enableNotify"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Notify Off"/>
+                android:text="N Off"/>
             <Button
                 android:id="@+id/btn_enableSensor"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sensor Off"/>
+                android:text="S Off"/>
             <Button
                 android:id="@+id/btn_readData"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Read data"/>
+                android:text="R data"/>
+            <Button
+                android:id="@+id/btn_stopReadData"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Stop"
+                android:textColor="@android:color/holo_red_light"/>
 
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/container_btn_row2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+            <Button
+                android:id="@+id/btn_saveData"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="save"/>
+            <Button
+                android:id="@+id/btn_exportData"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Export"/>
 
+
+        </LinearLayout>
 
         <ScrollView
             android:layout_width="match_parent"
@@ -194,6 +218,12 @@
 
         </ListView>
 
+
+        <!--<TextView-->
+            <!--android:id="@+id/GestureStatus"-->
+            <!--android:layout_width="wrap_content"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:text="Gesture status"/>-->
     </LinearLayout>
 
 

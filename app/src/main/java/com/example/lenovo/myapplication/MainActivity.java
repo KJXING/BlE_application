@@ -12,11 +12,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.LongDef;
+import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.design.widget.BottomNavigationView;
 import android.support.v7.app.AppCompatActivity;
-import android.text.LoginFilter;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
@@ -34,10 +33,19 @@ import android.bluetooth.BluetoothManager;
 import android.widget.Toast;
 
 
+import com.example.lenovo.myapplication.Model.MentionData;
+import com.example.lenovo.myapplication.Model.externalMention;
+import com.example.lenovo.myapplication.Model.buildInMention;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+
+import io.realm.Realm;
+import io.realm.RealmObject;
 
 import static android.bluetooth.BluetoothProfile.STATE_CONNECTED;
 import static android.bluetooth.BluetoothProfile.STATE_CONNECTING;
@@ -53,11 +61,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private static final UUID serviceBT_UUID = UUID.fromString("F000AA80-0451-4000-4000-000000000000");
     private static final UUID mentionBT_UUID = UUID.fromString("F000AA81-0451-4000-B000-000000000000");
     private static final UUID configureBT_UUID = UUID.fromString("F000AA82-0451-4000-B000-000000000000");
+    private static final UUID SetPeriod_UUID = UUID.fromString("F000AA83-0451-4000-B000-000000000000");
+
 
 
     private SensorManager mSensorManager;
     private Sensor accelerometer;
     private Sensor gyroscope;
+    private Sensor magnetometer;
     private String HomeTitleString = null;
 
 
@@ -65,6 +76,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private BluetoothGatt mBluetoothGatt;
     private BluetoothGattCharacteristic mentionCharacteristic;
     private BluetoothGattCharacteristic configureCharacteristic;
+    private BluetoothGattCharacteristic SetPeriodCharacteristic;
     private BluetoothGattDescriptor mDescriptor;
     private TextView mTextView;
     private TextView sensorTagTitle;
@@ -84,29 +96,67 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView sensorTag_mag_y_TV;
     private TextView sensorTag_mag_z_TV;
 
-    private boolean switch_notify = true;
-    private boolean switch_sensor = true;
+    private boolean switch_notify = false;
+    private boolean switch_saveBI = false;
+    private boolean clickOnce = false;
+
+    private Realm realm;
 
     private Button btnNotify;
     private Button btnEnableSensor;
     private Button btnReadData;
+    private Button btnStop;
+    private Button btnSave;
+    private Button btnExport;
 
+    private double[] sensorDataTemp = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    private double[][] rawData = {
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    };
+    private double[][] averageValue = {
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    };
+    private double[][] featureValue = {
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    };
 
+    private String[] StringLable = {"Standing", "Lying", "Sitting"};
     private ListView mListView;
     private List<BluetoothDevice> mStringList;
     private ListAdapter mListAdapter;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        realm = Realm.getDefaultInstance();
+
+//        iniDeleteDataAtDatabase();
+
+        iniMainActivity();
+
+        iniListData();
+        iniListAdapter();
 
 
-        iniMainActivityLayout();
-
-        iniData();
-        iniAdapter();
         iniSensor();
         initBluetoothAdapter();
 
@@ -122,16 +172,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         BottomNavigationView navigation = (BottomNavigationView) findViewById(R.id.navigation);
         navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
 
-    };
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        realm.close();
+    }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    private void iniMainActivityLayout(){
-        //find view by id
-        mTextView=findViewById(R.id.tv_title_top);
+    private void iniMainActivity() {
+        //TextView
+        mTextView = findViewById(R.id.tv_title_top);
         sensorTagTitle = findViewById(R.id.tv_title_sensorTag);
 
         acc_x_TV = findViewById(R.id.x_acc);
@@ -151,10 +208,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorTag_mag_y_TV = findViewById(R.id.sensorTag_y_Mag);
         sensorTag_mag_z_TV = findViewById(R.id.sensorTag_z_Mag);
 
+        //Button
         btnEnableSensor = findViewById(R.id.btn_enableSensor);
         btnNotify = findViewById(R.id.btn_enableNotify);
         btnReadData = findViewById(R.id.btn_readData);
+        btnStop = findViewById(R.id.btn_stopReadData);
+        btnExport = findViewById(R.id.btn_exportData);
+        btnSave = findViewById(R.id.btn_saveData);
 
+        //ListView
         mListView = findViewById(R.id.LV_activtyMain);
 
         //set ini Text
@@ -184,11 +246,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnNotify.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                enableNotification(mBluetoothGatt,mDescriptor);
-                if (switch_notify){
-                    btnNotify.setText("Notify On");
+                if (!switch_notify) {
+                    enableNotification(mBluetoothGatt, mDescriptor);
+                    btnNotify.setText("N On");
+                    switch_notify = true;
                 } else {
-                    btnNotify.setText("Notify Off");
+                    btnNotify.setText("N Off");
+                    switch_notify = false;
                 }
             }
         });
@@ -196,11 +260,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnEnableSensor.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-               boolean result_enableMovement = enableMovement(mBluetoothGatt,configureCharacteristic);
-                if (result_enableMovement){
-                    btnEnableSensor.setText("Sensor On");
+                boolean result_enableMovement = enableMovement(mBluetoothGatt, configureCharacteristic);
+                SetPeriod(mBluetoothGatt,SetPeriodCharacteristic);
+                if (result_enableMovement) {
+                    btnEnableSensor.setText("S On");
                 } else {
-                    btnEnableSensor.setText("Sensor Off");
+                    btnEnableSensor.setText("S Off");
                 }
             }
         });
@@ -208,20 +273,101 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnReadData.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                readCharacteristicValue(mBluetoothGatt,mentionCharacteristic);
+                if (clickOnce) {
+                    Toast.makeText(MainActivity.this, "只能点击一次，数据正在跑，去看数据日志", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                clickOnce = true;
+
+                new Thread(() -> {
+                    while (true){
+                        try {
+                            readCharacteristicValue(mBluetoothGatt, mentionCharacteristic);
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+                }).start();
+
+            }
+        });
+
+        btnStop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Realm realm = Realm.getDefaultInstance();
+                        try {
+
+                            while (true){
+                                saveExternalMentionData(realm,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
+                                Thread.sleep(100);
+                            }
+
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        } finally {
+                            realm.close();
+                        }
+
+
+                    }
+                }).start();
+
+            }
+        });
+
+        btnExport.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Toast.makeText(MainActivity.this, "Onclick btnExport", Toast.LENGTH_SHORT).show();
+
+                exportRealmFile();
+
+            }
+        });
+
+        btnSave.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+                if (switch_saveBI) {
+                    switch_saveBI = false;
+
+                } else {
+                    switch_saveBI = true;
+//                    saveExternalMentionData(System.currentTimeMillis(), sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[2]);
+//                    saveToDatabase(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[0]);
+                }
+
             }
         });
 
     }
 
-    private void iniSensor(){
-        mSensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mSensorManager.unregisterListener(MainActivity.this);
+
+    }
+
+    private void iniSensor() {
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 
         accelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         gyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        magnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
         mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(this,gyroscope,SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
 
     }
 
@@ -231,22 +377,36 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         float[] values = event.values;
         int sensorType = event.sensor.getType();
 
-        switch (sensorType){
+        switch (sensorType) {
             case Sensor.TYPE_GYROSCOPE:
                 gyro_x_TV.setText("gyro_x: " + values[0]);
                 gyro_y_TV.setText("gyro_y: " + values[1]);
                 gyro_z_TV.setText("gyro_z: " + values[2]);
+                sensorDataTemp[3] = values[0];
+                sensorDataTemp[4] = values[1];
+                sensorDataTemp[5] = values[2];
                 break;
 
             case Sensor.TYPE_ACCELEROMETER:
                 acc_x_TV.setText("x_Acc: " + values[0]);
                 acc_y_TV.setText("y_Acc: " + values[1]);
                 acc_z_TV.setText("z_Acc: " + values[2]);
+                sensorDataTemp[0] = values[0];
+                sensorDataTemp[1] = values[1];
+                sensorDataTemp[2] = values[2];
                 break;
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                sensorDataTemp[6] = values[0];
+                sensorDataTemp[7] = values[1];
+                sensorDataTemp[8] = values[2];
+                break;
+
             default:
                 break;
         }
-
+        if (switch_saveBI) {
+//            saveBuildInMentionData(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], StringLable[1]);
+        }
     }
 
     @Override
@@ -255,14 +415,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
-
-    private void initBluetoothAdapter(){
-        final BluetoothManager  mBluetoothManager =  (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+    private void initBluetoothAdapter() {
+        final BluetoothManager mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         BTAdapter = mBluetoothManager.getAdapter();
         // Phone does not support Bluetooth so let the user know and exit.
-        if (BTAdapter == null){
-            Toast.makeText(getBaseContext(),"Your phone does not support Bluetooth",Toast.LENGTH_LONG);
-            Log.d(tag,"Your phone does not support Bluetooth");
+        if (BTAdapter == null) {
+            Toast.makeText(getBaseContext(), "Your phone does not support Bluetooth", Toast.LENGTH_LONG);
+            Log.d(tag, "Your phone does not support Bluetooth");
             return;
         }
         // open phone`s bluetooth
@@ -273,13 +432,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
         if (BTAdapter.getScanMode() != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
             Intent i = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-            i.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,0);
+            i.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 0);
             startActivity(i);
         }
 
     }
 
-    public void scanAction(){
+    public void scanAction() {
         mTextView.setText("Scan BT Device");
         BTAdapter.startLeScan(mScanCallback);
     }
@@ -287,7 +446,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private BluetoothAdapter.LeScanCallback mScanCallback = new BluetoothAdapter.LeScanCallback() {
         @Override
         public void onLeScan(BluetoothDevice bluetoothDevice, int rss, byte[] bytes) {
-            Log.d(tag,bluetoothDevice.getName() + "  " + bluetoothDevice.getAddress() + "  " + rss);
+            Log.d(tag, bluetoothDevice.getName() + "  " + bluetoothDevice.getAddress() + "  " + rss);
             if (bluetoothDevice != null) {
                 if (!mStringList.contains(bluetoothDevice)) {
                     mStringList.add(bluetoothDevice);
@@ -299,15 +458,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
-    private void connectAction(){
+    private void connectAction() {
         mListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 BTAdapter.stopLeScan(mScanCallback);
 
                 BluetoothDevice BTDevice = (BluetoothDevice) adapterView.getItemAtPosition(i);
-                Log.d(tag,"Paring device " + BTDevice.getAddress());
-                mBluetoothGatt = BTDevice.connectGatt(MainActivity.this,false,getCallback);
+                Log.d(tag, "Paring device " + BTDevice.getAddress());
+                mBluetoothGatt = BTDevice.connectGatt(MainActivity.this, false, getCallback);
 
             }
         });
@@ -318,14 +477,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
             super.onPhyUpdate(gatt, txPhy, rxPhy, status);
 
-            Log.d(tag,"onPhyUpdate");
+            Log.d(tag, "onPhyUpdate");
         }
 
         @Override
         public void onPhyRead(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
             super.onPhyRead(gatt, txPhy, rxPhy, status);
 
-            Log.d(tag,"onPhyRead");
+            Log.d(tag, "onPhyRead");
         }
 
 
@@ -336,9 +495,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    switch (newState){
+                    switch (newState) {
                         case STATE_CONNECTED:
-                            Log.d(tag,"STATE_CONNECTED");
+                            Log.d(tag, "STATE_CONNECTED");
                             mTextView.setText(R.string.STATE_CONNECTED);
                             HomeTitleString = "STATE_CONNECTED";
                             //discoverServices from device
@@ -346,15 +505,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                             break;
                         case STATE_CONNECTING:
-                            Log.d(tag,"STATE_CONNECTING");
+                            Log.d(tag, "STATE_CONNECTING");
                             mTextView.setText(R.string.STATE_CONNECTING);
                             break;
                         case STATE_DISCONNECTED:
-                            Log.d(tag,"STATE_DISCONNECTED");
+                            Log.d(tag, "STATE_DISCONNECTED");
                             mTextView.setText(R.string.STATE_DISCONNECTED);
                             break;
                         case STATE_DISCONNECTING:
-                            Log.d(tag,"STATE_DISCONNECTING");
+                            Log.d(tag, "STATE_DISCONNECTING");
                             mTextView.setText(R.string.STATE_DISCONNECTING);
                             break;
                         default:
@@ -370,27 +529,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
 
-            if (status == mBluetoothGatt.GATT_SUCCESS){
-               List<BluetoothGattService> servers = mBluetoothGatt.getServices();
-               for (BluetoothGattService bluetoothGattService: servers){
-                   Log.d(tag,"Service " + bluetoothGattService.getUuid().toString());
-                   List<BluetoothGattCharacteristic> Characteristics = bluetoothGattService.getCharacteristics();
+            if (status == mBluetoothGatt.GATT_SUCCESS) {
+                List<BluetoothGattService> servers = mBluetoothGatt.getServices();
+                for (BluetoothGattService bluetoothGattService : servers) {
+                    Log.d(tag, "Service " + bluetoothGattService.getUuid().toString());
+                    List<BluetoothGattCharacteristic> Characteristics = bluetoothGattService.getCharacteristics();
 
-                   for (BluetoothGattCharacteristic bluetoothGattCharacteristic: Characteristics){
-                       Log.d(tag,"  Chars " + bluetoothGattCharacteristic.getUuid().toString());
-                       if (bluetoothGattCharacteristic.getUuid().equals(mentionBT_UUID)){
-                           mentionCharacteristic = bluetoothGattCharacteristic;
-                           mDescriptor = mentionCharacteristic.getDescriptor(mentionNotify_UUID);
-                       } else if (bluetoothGattCharacteristic.getUuid().equals(configureBT_UUID)){
-                           configureCharacteristic =bluetoothGattCharacteristic;
+                    for (BluetoothGattCharacteristic bluetoothGattCharacteristic : Characteristics) {
+                        Log.d(tag, "  Chars " + bluetoothGattCharacteristic.getUuid().toString());
+                        if (bluetoothGattCharacteristic.getUuid().equals(mentionBT_UUID)) {
+                            mentionCharacteristic = bluetoothGattCharacteristic;
+                            mDescriptor = mentionCharacteristic.getDescriptor(mentionNotify_UUID);
+                        } else if (bluetoothGattCharacteristic.getUuid().equals(configureBT_UUID)) {
+                            configureCharacteristic = bluetoothGattCharacteristic;
 
-                       }
+                        }else if (bluetoothGattCharacteristic.getUuid().equals(SetPeriod_UUID)) {
+                            SetPeriodCharacteristic = bluetoothGattCharacteristic;
 
-                   }
+                        }
 
-               }
+                    }
 
-            mTextView.setText(R.string.Title_sensorTag_status_RFC);
+                }
+
+                mTextView.setText(R.string.Title_sensorTag_status_RFC);
             }
 
         }
@@ -399,15 +561,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicRead(gatt, characteristic, status);
 
-            if (status == mBluetoothGatt.GATT_SUCCESS){
-                if (characteristic.getUuid().toString().equals(mentionCharacteristic.getUuid().toString() )){
-                    sensorMpu9250AccConvert(characteristic);
+            if (status == mBluetoothGatt.GATT_SUCCESS) {
+                if (characteristic.getUuid().toString().equals(mentionCharacteristic.getUuid().toString())) {
+                    sensorMpu9250Convert(characteristic);
 
+                    Log.d(tag, "onCharacteristicRead SUCCESS");
                     gatt.readCharacteristic(characteristic);
 
-                    Log.d(tag,"onCharacteristicRead SUCCESS" );
                 } else {
-                    Log.d(tag,"onCharacteristicRead was run but the status is not GATT SUCCESS " + status);
+                    Log.d(tag, "onCharacteristicRead was run but the status is not GATT SUCCESS " + status);
                 }
             }
 
@@ -417,16 +579,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicWrite(gatt, characteristic, status);
-            Log.d(tag,"onCharacteristicWrite " + status);
+            Log.d(tag, "onCharacteristicWrite " + status);
 
 
-            if (status == mBluetoothGatt.GATT_SUCCESS){
-                Log.d(tag,"status == mBluetoothGatt.GATT_SUCCESS " + status);
-                if (characteristic.getUuid().toString().equals(configureCharacteristic.getUuid().toString())){
-                    Log.d(tag,"configureCharacteristic onCharacteristicWrite SUCCESS.");
+            if (status == mBluetoothGatt.GATT_SUCCESS) {
+                Log.d(tag, "status == mBluetoothGatt.GATT_SUCCESS " + status);
+                if (characteristic.getUuid().toString().equals(configureCharacteristic.getUuid().toString())) {
+                    Log.d(tag, "configureCharacteristic onCharacteristicWrite SUCCESS.");
                 }
-            }else if (status == mBluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH){
-                Log.d(tag,"status == mBluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH " + status);
+            } else if (status == mBluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH) {
+                Log.d(tag, "status == mBluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH " + status);
             }
         }
 
@@ -434,19 +596,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
 
-            Log.d(tag,"onCharacteristicChanged");
+            Log.d(tag, "onCharacteristicChanged");
         }
 
         @Override
         public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             super.onDescriptorRead(gatt, descriptor, status);
 
-            Log.d(tag,"onDescriptorRead run");
+            Log.d(tag, "onDescriptorRead run");
 
-            if (status == BluetoothGatt.GATT_SUCCESS){
-                Log.d(tag,"onDescriptorRead successfully");
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(tag, "onDescriptorRead successfully");
             } else {
-                Log.d(tag,"onDescriptorRead failure " + status);
+                Log.d(tag, "onDescriptorRead failure " + status);
             }
         }
 
@@ -454,12 +616,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             super.onDescriptorWrite(gatt, descriptor, status);
 
-            Log.d(tag,"onDescriptorWrite run");
+            Log.d(tag, "onDescriptorWrite run");
 
-            if (status == BluetoothGatt.GATT_SUCCESS){
-                Log.d(tag,"onDescriptorWrite successfully");
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(tag, "onDescriptorWrite successfully");
             } else {
-                Log.d(tag,"onDescriptorWrite failure " + status);
+                Log.d(tag, "onDescriptorWrite failure " + status);
             }
 
         }
@@ -482,80 +644,87 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
 
 
-
-
     };
 
 
-
     //Run successfully
-    private void readCharacteristicValue(BluetoothGatt gatt,BluetoothGattCharacteristic characteristic){
+    private boolean readCharacteristicValue(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
 
         boolean result = gatt.readCharacteristic(characteristic);
 
-        if (result){
-            Log.d(tag,"readCharacteristic success");
-        }else{
-            Log.d(tag,"readCharacteristic failure");
+        if (result) {
+            Log.d(tag, "readCharacteristic success");
+
+        } else {
+            Log.d(tag, "readCharacteristic failure");
         }
 
-
+        return result;
 
     }
 
-    private void enableNotification(BluetoothGatt gatt, BluetoothGattDescriptor descriptor){
+    private void enableNotification(BluetoothGatt gatt, BluetoothGattDescriptor descriptor) {
         boolean result = false;
-        Log.d(tag,"enableNotification called");
+        Log.d(tag, "enableNotification called");
 
-        if (descriptor != null){
-            result = descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE );
+        if (descriptor != null) {
+            result = descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
 
         } else {
-            Log.d(tag,"enableNotification setValue descriptor == null");
+            Log.d(tag, "enableNotification setValue descriptor == null");
         }
 
 
-        Log.d(tag,"enableNotification ENABLE_NOTIFICATION_VALUE result " + result);
-        if (result){
-            Log.d(tag,"set enableNotification ENABLE_NOTIFICATION_VALUE value true");
+        Log.d(tag, "enableNotification ENABLE_NOTIFICATION_VALUE result " + result);
+        if (result) {
+            Log.d(tag, "set enableNotification ENABLE_NOTIFICATION_VALUE value true");
         } else {
-            Log.d(tag,"set enableNotification ENABLE_NOTIFICATION_VALUE value false");
+            Log.d(tag, "set enableNotification ENABLE_NOTIFICATION_VALUE value false");
         }
 
         gatt.writeDescriptor(descriptor);
 
-        Log.d(tag,"enableNotification has execute");
-
-
     }
 
-    private boolean enableMovement(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
-        characteristic.setValue(new byte[] {(byte) 0xfe,(byte) 0x80 });
+    private boolean enableMovement(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+        characteristic.setValue(new byte[]{(byte) 0xff, (byte) 0x80});
         boolean result = gatt.writeCharacteristic(characteristic);
 
-        if (result){
-           Log.d(tag,"writeCharacteristic success");
+        if (result) {
+            Log.d(tag, "writeCharacteristic success");
         } else {
-            Log.d(tag,"writeCharacteristic failure");
+            Log.d(tag, "writeCharacteristic failure");
         }
-        Log.d(tag,"configure value: "+ characteristic.getValue().toString());
-        Log.d(tag,"enableMovement finished.");
+        Log.d(tag, "configure value: " + characteristic.getValue().toString());
+        Log.d(tag, "enableMovement finished.");
 
         return result;
     }
 
+    private void SetPeriod(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
+        characteristic.setValue(new byte[]{(byte)0x0A});
 
-    private void iniData(){
+        boolean result = gatt.writeCharacteristic(characteristic);
+
+        if (result) {
+            Log.d(tag, "SetPeriod writeCharacteristic success");
+        } else {
+            Log.d(tag, "SetPeriod writeCharacteristic failure");
+        }
+
+    }
+
+    private void iniListData() {
         mStringList = new ArrayList();
     }
 
-    private void iniAdapter(){
+    private void iniListAdapter() {
         mListAdapter = new ListAdapter(this, mStringList);
         mListView.setAdapter(mListAdapter);
     }
 
-    private void displaySensorData(boolean DisplaySwitch){
-        if (DisplaySwitch){
+    private void displaySensorData(boolean DisplaySwitch) {
+        if (DisplaySwitch) {
             sensorTagTitle.setVisibility(View.VISIBLE);
 
             acc_x_TV.setVisibility(View.VISIBLE);
@@ -602,37 +771,42 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
 
 
-
-
     }
 
-    private void displayBTDeviceList(boolean DisplaySwitch){
+    private void displayBTDeviceList(boolean DisplaySwitch) {
 
-        if (DisplaySwitch){
+        if (DisplaySwitch) {
             mListView.setVisibility(View.VISIBLE);
         } else {
             mListView.setVisibility(View.GONE);
         }
 
     }
-    private void displayBtn(boolean DisplaySwitch){
-        if (DisplaySwitch){
+
+    private void displayBtn(boolean DisplaySwitch) {
+        if (DisplaySwitch) {
             btnNotify.setVisibility(View.VISIBLE);
             btnEnableSensor.setVisibility(View.VISIBLE);
             btnReadData.setVisibility(View.VISIBLE);
+            btnStop.setVisibility(View.VISIBLE);
+            btnSave.setVisibility(View.VISIBLE);
+            btnExport.setVisibility(View.VISIBLE);
+
         } else {
             btnNotify.setVisibility(View.GONE);
             btnEnableSensor.setVisibility(View.GONE);
             btnReadData.setVisibility(View.GONE);
+            btnStop.setVisibility(View.GONE);
+            btnSave.setVisibility(View.GONE);
+            btnExport.setVisibility(View.GONE);
         }
     }
 
-    private void sensorMpu9250AccConvert(BluetoothGattCharacteristic BTCharacteristic){
+    private void sensorMpu9250Convert(BluetoothGattCharacteristic BTCharacteristic) {
 
-        byte [] value = BTCharacteristic.getValue();
+        byte[] value = BTCharacteristic.getValue();
 
-        Log.d(tag,"sensorMpu9250AccConvert byte value= " + value.toString());
-        if (BTCharacteristic.equals(mentionCharacteristic)){
+        if (BTCharacteristic.equals(mentionCharacteristic)) {
             Point3D value_acc;
             Point3D value_gyro;
             Point3D value_mag;
@@ -642,6 +816,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             value_gyro = sensorConvert.gyroConvert(value);
             value_mag = sensorConvert.magConvert(value);
 
+            sensorDataTemp[9] = value_acc.x;
+            sensorDataTemp[10] = value_acc.y;
+            sensorDataTemp[11] = value_acc.z;
+            sensorDataTemp[12] = value_gyro.x;
+            sensorDataTemp[13] = value_gyro.y;
+            sensorDataTemp[14] = value_gyro.z;
+            sensorDataTemp[15] = value_mag.x;
+            sensorDataTemp[16] = value_mag.y;
+            sensorDataTemp[17] = value_mag.z;
 
             sensorTag_acc_x_TV.setText("x_Acc: " + Double.toString(value_acc.x));
             sensorTag_acc_y_TV.setText("y_Acc: " + Double.toString(value_acc.y));
@@ -653,22 +836,259 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             sensorTag_mag_y_TV.setText("y_Mag: " + Double.toString(value_mag.y));
             sensorTag_mag_z_TV.setText("z_Mag: " + Double.toString(value_mag.z));
 
-
-            Log.d(tag,"value_acc " + value_acc.x + "   " +  value_acc.y + "  " + value_acc.z);
-            Log.d(tag,"value_gyro " + value_gyro.x + "   " + value_gyro.y + "   " + value_gyro.z);
-            Log.d(tag,"value_mag " + value_mag.x + "   " + value_mag.y + "   " + value_mag.z);
-            
         }
+
+
+    }
+
+    private void saveToDatabase(Realm realm, final long q_time, final double x_AccBI, final double y_AccBI, final double z_AccBI, final double x_GyroBI, final double y_GyroBI, final double z_GyroBI, final double x_MagBI, final double y_MagBI, final double z_MagBI, final double x_AccEX, final double y_AccEX, final double z_AccEX, final double x_GyroEX, final double y_GyroEX, final double z_GyroEX, final double x_MagEX, final double y_MagEX, final double z_MagEX, final String q_lable) {
+        realm.executeTransactionAsync(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                MentionData mentionData = realm.createObject(MentionData.class);
+                mentionData.setTimestamp(q_time);
+                mentionData.setxAccBI(x_AccBI);
+                mentionData.setyAccBI(y_AccBI);
+                mentionData.setzAccBI(z_AccBI);
+                mentionData.setxGyroBI(x_GyroBI);
+                mentionData.setyGyroBI(y_GyroBI);
+                mentionData.setzGyroBI(z_GyroBI);
+                mentionData.setxMagBI(x_MagBI);
+                mentionData.setyMagBI(y_MagBI);
+                mentionData.setzMagEX(z_MagBI);
+
+                mentionData.setxAccEx(x_AccEX);
+                mentionData.setyAccEX(y_AccEX);
+                mentionData.setzAccEX(z_AccEX);
+                mentionData.setxGyroEX(x_GyroEX);
+                mentionData.setyGyroEX(y_GyroEX);
+                mentionData.setzGyroEX(z_GyroEX);
+                mentionData.setxMagEx(x_MagEX);
+                mentionData.setyMagEX(y_MagEX);
+                mentionData.setzMagEX(z_MagEX);
+
+                mentionData.setGestureState(q_lable);
+            }
+        }, new Realm.Transaction.OnSuccess() {
+            @Override
+            public void onSuccess() {
+                Log.d(tag, "save to database success");
+            }
+        }, new Realm.Transaction.OnError() {
+            @Override
+            public void onError(Throwable error) {
+                Log.d(tag, "save to database error");
+            }
+        });
+    }
+
+    public void saveExternalMentionData(Realm realm, final long q_time, final double x_AccEX, final double y_AccEX, final double z_AccEX, final double x_GyroEX, final double y_GyroEX, final double z_GyroEX, final double x_MagEX, final double y_MagEX, final double z_MagEX, final String q_lable) {
+
+        realm.executeTransaction(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                externalMention externalMention = realm.createObject(externalMention.class);
+                externalMention.setTimestamp(q_time);
+                externalMention.setxAccEx(x_AccEX);
+                externalMention.setyAccEx(y_AccEX);
+                externalMention.setzAccEx(z_AccEX);
+                externalMention.setxGyroEx(x_GyroEX);
+                externalMention.setyGyroEx(y_GyroEX);
+                externalMention.setzGyroEx(z_GyroEX);
+                externalMention.setxMagEx(x_MagEX);
+                externalMention.setyMagEx(y_MagEX);
+                externalMention.setzMagEx(z_MagEX);
+
+                externalMention.setGestureState(q_lable);
+            }
+        });
+    }
+
+    private void saveBuildInMentionData(Realm realm,final long q_time, final double x_AccBI, final double y_AccBI, final double z_AccBI, final double x_GyroBI, final double y_GyroBI, final double z_GyroBI, final double x_MagBI, final double y_MagBI, final double z_MagBI, final String q_lable) {
+        realm.executeTransactionAsync(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                buildInMention buildInMention = realm.createObject(buildInMention.class);
+                buildInMention.setTimestamp(q_time);
+                buildInMention.setxAccBi(x_AccBI);
+                buildInMention.setyAccBi(y_AccBI);
+                buildInMention.setzAccBi(z_AccBI);
+                buildInMention.setxGyroBi(x_GyroBI);
+                buildInMention.setyGyroBi(y_GyroBI);
+                buildInMention.setzGyroBi(z_GyroBI);
+                buildInMention.setxMagBi(x_MagBI);
+                buildInMention.setyMagBi(y_MagBI);
+                buildInMention.setzMagBi(z_MagBI);
+                buildInMention.setGestureState(q_lable);
+            }
+        }, new Realm.Transaction.OnSuccess() {
+            @Override
+            public void onSuccess() {
+                Log.d(tag, "save buildInMention to database success");
+            }
+        }, new Realm.Transaction.OnError() {
+            @Override
+            public void onError(Throwable error) {
+                Log.d(tag, "save buildInMention to database error");
+            }
+        });
+    }
+
+    private void exportRealmFile() {
+
+        Log.d(tag,"------->Start exportRealmFile<--------");
+        final File file = new File(Environment.getExternalStorageDirectory().getPath().concat("/sample.realm"));
+        if (file.exists()) {
+            file.delete();
+        }
+        realm.writeCopyTo(file);
+        Toast.makeText(MainActivity.this, "Success export realm file", Toast.LENGTH_SHORT).show();
+    }
+
+//    private void iniDeleteDataAtDatabase() {
+//        realm.executeTransaction(new Realm.Transaction() {
+//            @Override
+//            public void execute(Realm realm) {
+//                realm.delete(MentionData.class);
+//                realm.delete(externalMention.class);
+//                realm.delete(buildInMention.class);
+//            }
+//        });
+//    }
+
+    private void pushStackRowData(double[][] q_arr, double[] q_arrRead) {
+        moveStack(q_arr);
+        for (int i = 0; i < q_arr.length; i++) {
+            if (i == 0) {
+                q_arr[i][0] = q_arrRead[9];
+            } else if (i == 1) {
+                q_arr[i][0] = q_arrRead[10];
+            } else if (i == 2) {
+                q_arr[i][0] = q_arrRead[11];
+            } else if (i == 3) {
+                q_arr[i][0] = q_arrRead[12];
+            } else if (i == 4) {
+                q_arr[i][0] = q_arrRead[13];
+            } else if (i == 5) {
+                q_arr[i][0] = q_arrRead[14];
+            } else if (i == 6) {
+                q_arr[i][0] = q_arrRead[15];
+            } else if (i == 7) {
+                q_arr[i][0] = q_arrRead[16];
+            } else if (i == 8) {
+                q_arr[i][0] = q_arrRead[17];
+            }
+        }
+        Log.d(tag,"---->pushStackRowData finish<----");
+        Log.d(tag,"RowData:" + Arrays.deepToString(q_arr));
+
+    }
+
+    private void pushStackAverageValue(double[][] q_arr, double q_value, int cont) {
+        moveStack(averageValue);
+        q_arr[cont][0] = q_value;
+    }
+
+    private void pushStackFeatureValue(double[] q_arrRead,double[][] q_arrWrite){
+        moveStack(q_arrWrite);
+
+        for (int i = 0; i < q_arrRead.length; i++) {
+            q_arrWrite[i][0] = q_arrRead[i];
+        }
+
+    }
+
+    private void moveStack(double[][] q_arr) {
+
+        for (int i = 0; i < q_arr.length; i++) {
+            for (int j = q_arr[i].length - 1; j > 0; j--) {
+                q_arr[i][j] = q_arr[i][j-1];
+            }
+        }
+
+
+    }
+
+    private double calAverage(double[] q_singleArr) {
+        double averageValue = 0;
+        for (int i = 0; i < q_singleArr.length; i++) {
+            averageValue = averageValue + q_singleArr[i];
+        }
+        return averageValue / q_singleArr.length;
+    }
+
+    private void calAverageValue(double[][] q_arr) {
+        double temp = 0;
+        for (int i = 0; i < q_arr.length; i++) {
+            temp = calAverage(q_arr[i]);
+            pushStackAverageValue(averageValue,temp,i);
+        }
+
+        Log.d(tag,"averageValue:" + Arrays.deepToString(averageValue));
+    }
+
+    private double calFeature(double q_x, double q_y, double q_z) {
+        double temp = 0;
+
+        temp = Math.sqrt(q_x * q_x + q_y * q_y + q_z * q_z);
+
+        return temp;
+    }
+
+    private void calFeatureValue(double[][] q_arr) {
+
+        double[] arrys = {0,0,0,0,0,0,0,0,0};
+        double[] temp = {0,0,0};
+
+
+
+        for (int i = 0; i < q_arr.length; i++) {
+            arrys[i]=q_arr[i][0];
+        }
+
+        temp[0] = calFeature(arrys[0],arrys[1],arrys[2]);
+        temp[1] = calFeature(arrys[3],arrys[4],arrys[5]);
+        temp[2] = calFeature(arrys[6],arrys[7],arrys[8]);
+
+        pushStackFeatureValue(temp,featureValue);
+
+        Log.d(tag,"featureValue:"+ Arrays.deepToString(featureValue));
+    }
+
+    private double maxValue(double[] q_arrs){
+        double max = q_arrs[0];
+        for (int i = 0; i < q_arrs.length; i++) {
+            if (q_arrs[i] > max){
+                max = q_arrs[i];
+            }
+        }
+        return max;
     }
 
 
+    private double minValue(double[] q_arrs){
+        double min = q_arrs[0];
+        for (int i = 0; i < q_arrs.length; i++) {
+            if (q_arrs[i] < min){
+                min = q_arrs[i];
+            }
+        }
+        return min;
+    }
+
+    private boolean fallDetection(double[][] q_arr){
+        double A_max = maxValue(q_arr[0]);
+        double A_min = minValue(q_arr[0]);
+        double G_max = maxValue(q_arr[1]);
+        double G_min = minValue(q_arr[1]);
+
+        if (Math.abs(A_max - A_min) < 0.4 && Math.abs(G_max - G_min) < 60 ){
+            return true;
+        }
 
 
-
-
-
-
-
+        return false;
+    }
 
 
 
@@ -679,12 +1099,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public boolean onNavigationItemSelected(@NonNull MenuItem item) {
             switch (item.getItemId()) {
                 case R.id.navigation_home:
-                    if (HomeTitleString != null){
+                    if (HomeTitleString != null) {
                         mTextView.setText(HomeTitleString);
                     }
-                    if (mTextView.getText() == "Dashboard"){
+                    if (mTextView.getText() == "Dashboard") {
                         mTextView.setText(HomeTitleString);
-                    } else if (mTextView.getText() == "Notifications"){
+                    } else if (mTextView.getText() == "Notifications") {
                         mTextView.setText(HomeTitleString);
                     }
                     displaySensorData(false);
@@ -694,9 +1114,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
                 case R.id.navigation_dashboard:
-                    if (!(mTextView.getText() == "Inner Sensor")){
+                    if (!(mTextView.getText() == "Inner Sensor")) {
                         HomeTitleString = mTextView.getText().toString();
-                    } else if(!(mTextView.getText()== "Notifications")){
+                    } else if (!(mTextView.getText() == "Notifications")) {
                         HomeTitleString = mTextView.getText().toString();
                     }
 
@@ -708,9 +1128,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     return true;
 
                 case R.id.navigation_notifications:
-                    if (!(mTextView.getText() == "Dashboard")){
+                    if (!(mTextView.getText() == "Dashboard")) {
                         HomeTitleString = mTextView.getText().toString();
-                    } else if(!(mTextView.getText()== "Notifications")){
+                    } else if (!(mTextView.getText() == "Notifications")) {
                         HomeTitleString = mTextView.getText().toString();
                     }
 
@@ -724,6 +1144,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             return false;
         }
     };
+
+
+
 
 }
 
