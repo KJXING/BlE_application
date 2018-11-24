@@ -98,7 +98,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private boolean switch_notify = false;
     private boolean switch_saveBI = false;
+    private boolean switch_saveEX = false;
     private boolean clickOnce = false;
+
 
     private Realm realm;
 
@@ -149,7 +151,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         setContentView(R.layout.activity_main);
         realm = Realm.getDefaultInstance();
 
-//        iniDeleteDataAtDatabase();
+        iniDeleteDataAtDatabase();
 
         iniMainActivity();
 
@@ -280,10 +282,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 clickOnce = true;
 
                 new Thread(() -> {
+                    Realm realm1 = Realm.getDefaultInstance();
+
                     while (true){
                         try {
                             readCharacteristicValue(mBluetoothGatt, mentionCharacteristic);
-                            Thread.sleep(100);
+//                            if(switch_saveEX){
+//                                saveExternalMentionData(realm1,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
+//                            }
+                            Thread.sleep(90);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -298,16 +305,37 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             @Override
             public void onClick(View view) {
 
+                mSensorManager.unregisterListener(MainActivity.this);
+
+            }
+        });
+
+        btnExport.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Toast.makeText(MainActivity.this, "Onclick btnExport", Toast.LENGTH_SHORT).show();
+                exportRealmFile();
+
+            }
+        });
+
+        btnSave.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+
+
+
 
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        Realm realm = Realm.getDefaultInstance();
+                        Realm realm1 = Realm.getDefaultInstance();
                         try {
 
                             while (true){
-                                saveExternalMentionData(realm,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
-                                Thread.sleep(100);
+                                saveExternalMentionData(realm1,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
+
+                                Thread.sleep(92);
                             }
 
                         } catch (InterruptedException e) {
@@ -320,31 +348,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     }
                 }).start();
 
-            }
-        });
-
-        btnExport.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Toast.makeText(MainActivity.this, "Onclick btnExport", Toast.LENGTH_SHORT).show();
-
-                exportRealmFile();
-
-            }
-        });
-
-        btnSave.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-
-                if (switch_saveBI) {
-                    switch_saveBI = false;
-
-                } else {
-                    switch_saveBI = true;
 //                    saveExternalMentionData(System.currentTimeMillis(), sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[2]);
 //                    saveToDatabase(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[0]);
-                }
+
 
             }
         });
@@ -486,7 +492,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             Log.d(tag, "onPhyRead");
         }
-
 
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, final int newState) {
@@ -702,6 +707,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void SetPeriod(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
+
         characteristic.setValue(new byte[]{(byte)0x0A});
 
         boolean result = gatt.writeCharacteristic(characteristic);
@@ -900,6 +906,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 externalMention.setzMagEx(z_MagEX);
 
                 externalMention.setGestureState(q_lable);
+
+                Log.d(tag,"---->saveExternalMentionData successfully<-----");
             }
         });
     }
@@ -935,26 +943,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void exportRealmFile() {
-
+        Realm realm = Realm.getDefaultInstance();
         Log.d(tag,"------->Start exportRealmFile<--------");
         final File file = new File(Environment.getExternalStorageDirectory().getPath().concat("/sample.realm"));
         if (file.exists()) {
             file.delete();
         }
         realm.writeCopyTo(file);
+        realm.close();
         Toast.makeText(MainActivity.this, "Success export realm file", Toast.LENGTH_SHORT).show();
     }
 
-//    private void iniDeleteDataAtDatabase() {
-//        realm.executeTransaction(new Realm.Transaction() {
-//            @Override
-//            public void execute(Realm realm) {
-//                realm.delete(MentionData.class);
-//                realm.delete(externalMention.class);
-//                realm.delete(buildInMention.class);
-//            }
-//        });
-//    }
+    private void iniDeleteDataAtDatabase() {
+        realm.executeTransaction(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                realm.delete(MentionData.class);
+                realm.delete(externalMention.class);
+                realm.delete(buildInMention.class);
+            }
+        });
+    }
 
     private void pushStackRowData(double[][] q_arr, double[] q_arrRead) {
         moveStack(q_arr);
