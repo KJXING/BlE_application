@@ -39,6 +39,7 @@ import com.example.lenovo.myapplication.Model.buildInMention;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -46,6 +47,8 @@ import java.util.UUID;
 
 import io.realm.Realm;
 import io.realm.RealmObject;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
 
 import static android.bluetooth.BluetoothProfile.STATE_CONNECTED;
 import static android.bluetooth.BluetoothProfile.STATE_CONNECTING;
@@ -57,6 +60,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     private final String tag = "KE,Junxing";
+    private final String tag1 = "realm:";
+
+
     private static final UUID mentionNotify_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final UUID serviceBT_UUID = UUID.fromString("F000AA80-0451-4000-4000-000000000000");
     private static final UUID mentionBT_UUID = UUID.fromString("F000AA81-0451-4000-B000-000000000000");
@@ -110,6 +116,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Button btnStop;
     private Button btnSave;
     private Button btnExport;
+    private Button btnDetection;
 
     private double[] sensorDataTemp = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     private double[][] rawData = {
@@ -154,10 +161,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         iniDeleteDataAtDatabase();
 
         iniMainActivity();
+        btnSetOnClickListener();
 
         iniListData();
         iniListAdapter();
-
 
         iniSensor();
         initBluetoothAdapter();
@@ -217,6 +224,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnStop = findViewById(R.id.btn_stopReadData);
         btnExport = findViewById(R.id.btn_exportData);
         btnSave = findViewById(R.id.btn_saveData);
+        btnDetection = findViewById(R.id.btn_detection);
 
         //ListView
         mListView = findViewById(R.id.LV_activtyMain);
@@ -245,6 +253,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         displayBtn(false);
 
+
+    }
+
+
+    private void btnSetOnClickListener(){
         btnNotify.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -287,9 +300,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     while (true){
                         try {
                             readCharacteristicValue(mBluetoothGatt, mentionCharacteristic);
-//                            if(switch_saveEX){
-//                                saveExternalMentionData(realm1,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
-//                            }
                             Thread.sleep(90);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
@@ -323,9 +333,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             @Override
             public void onClick(View view) {
 
-
-
-
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -335,7 +342,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             while (true){
                                 saveExternalMentionData(realm1,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
 
-                                Thread.sleep(92);
+                                Thread.sleep(90);
                             }
 
                         } catch (InterruptedException e) {
@@ -351,17 +358,53 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //                    saveExternalMentionData(System.currentTimeMillis(), sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[2]);
 //                    saveToDatabase(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[0]);
 
+//            saveBuildInMentionData(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], StringLable[1]);
 
             }
         });
 
+
+
+        btnDetection.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                new Thread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        Realm realm2 =Realm.getDefaultInstance();
+                        long timeTemp = System.currentTimeMillis();
+                        RealmQuery<externalMention> query = realm2.where(externalMention.class);
+
+
+                        try {
+
+                            while (true){
+
+                                query.between("timestamp",timeTemp-1000,timeTemp);
+
+                                RealmResults<externalMention> results = query.findAll();
+
+                                Log.d(tag1,"----->" + results);
+
+                                timeTemp = timeTemp + 90;
+                                Thread.sleep(120);
+                            }
+
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+                }).start();
+            }
+        });
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         mSensorManager.unregisterListener(MainActivity.this);
-
     }
 
     private void iniSensor() {
@@ -409,9 +452,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             default:
                 break;
-        }
-        if (switch_saveBI) {
-//            saveBuildInMentionData(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], StringLable[1]);
         }
     }
 
@@ -797,6 +837,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             btnStop.setVisibility(View.VISIBLE);
             btnSave.setVisibility(View.VISIBLE);
             btnExport.setVisibility(View.VISIBLE);
+            btnDetection.setVisibility(View.VISIBLE);
+
 
         } else {
             btnNotify.setVisibility(View.GONE);
@@ -805,6 +847,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             btnStop.setVisibility(View.GONE);
             btnSave.setVisibility(View.GONE);
             btnExport.setVisibility(View.GONE);
+            btnDetection.setVisibility(View.GONE);
         }
     }
 
@@ -821,6 +864,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             value_acc = sensorConvert.accConvert(value);
             value_gyro = sensorConvert.gyroConvert(value);
             value_mag = sensorConvert.magConvert(value);
+
 
             sensorDataTemp[9] = value_acc.x;
             sensorDataTemp[10] = value_acc.y;

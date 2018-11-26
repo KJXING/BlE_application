@@ -72,6 +72,11 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Export"/>
+            <Button
+                android:id="@+id/btn_detection"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="detection"/>
 
 
         </LinearLayout>
