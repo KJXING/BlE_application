@@ -1,5 +1,6 @@
 package com.example.lenovo.myapplication.Model;
 
+
 import io.realm.RealmObject;
 
 public class externalMention extends RealmObject {

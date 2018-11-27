@@ -85,6 +85,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private BluetoothGattCharacteristic SetPeriodCharacteristic;
     private BluetoothGattDescriptor mDescriptor;
     private TextView mTextView;
+    private TextView activityStatus;
     private TextView sensorTagTitle;
     private TextView acc_x_TV;
     private TextView acc_y_TV;
@@ -199,6 +200,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         //TextView
         mTextView = findViewById(R.id.tv_title_top);
         sensorTagTitle = findViewById(R.id.tv_title_sensorTag);
+        activityStatus = findViewById(R.id.tv_status);
 
         acc_x_TV = findViewById(R.id.x_acc);
         acc_y_TV = findViewById(R.id.y_acc);
@@ -372,23 +374,37 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                     @Override
                     public void run() {
-                        Realm realm2 =Realm.getDefaultInstance();
-                        long timeTemp = System.currentTimeMillis();
-                        RealmQuery<externalMention> query = realm2.where(externalMention.class);
-
-
+//                        Realm realm2 =Realm.getDefaultInstance();
+//                        long timeTemp = System.currentTimeMillis();
+                        boolean result = false;
                         try {
 
                             while (true){
 
-                                query.between("timestamp",timeTemp-1000,timeTemp);
+//                                RealmQuery<externalMention> query = realm2.where(externalMention.class);
+                                pushStackRowData(rawData,sensorDataTemp);
+                                calAverageValue(rawData);
+                                calFeatureValue(averageValue);
 
-                                RealmResults<externalMention> results = query.findAll();
+                                result = fallDetection(featureValue);
 
-                                Log.d(tag1,"----->" + results);
+                                if (result){
+                                    activityStatus.setText("Static Postures");
+                                    result = false;
+                                } else {
+                                    activityStatus.setText("Dynamic Transitions");
 
-                                timeTemp = timeTemp + 90;
-                                Thread.sleep(120);
+                                }
+
+//                                Log.d(tag1,"----->" + timeTemp);
+//
+////                                query.between("timestamp",timeTemp-1000,timeTemp);
+//                                query.greaterThanOrEqualTo("timestamp",timeTemp-1000);
+//                                RealmResults<externalMention> results = query.findAll();
+//
+//                                Log.d(tag1,"----->" + results);
+//                                timeTemp = timeTemp + 100;
+                                Thread.sleep(100);
                             }
 
                         } catch (InterruptedException e) {
@@ -1135,7 +1151,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         double G_max = maxValue(q_arr[1]);
         double G_min = minValue(q_arr[1]);
 
-        if (Math.abs(A_max - A_min) < 0.4 && Math.abs(G_max - G_min) < 60 ){
+        if (Math.abs(A_max - A_min) <= 3 && Math.abs(G_max - G_min) <= 60 ){
+
+            Log.d(tag,"Math.abs(A_max - A_min):" + Math.abs(A_max - A_min));
+            Log.d(tag,"Math.abs(G_max - G_min):" + Math.abs(G_max - G_min));
             return true;
         }
 
