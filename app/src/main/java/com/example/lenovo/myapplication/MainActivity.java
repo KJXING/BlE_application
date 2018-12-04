@@ -56,7 +56,7 @@ import static android.bluetooth.BluetoothProfile.STATE_DISCONNECTED;
 import static android.bluetooth.BluetoothProfile.STATE_DISCONNECTING;
 
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
+public class MainActivity extends AppCompatActivity   {
 
 
     private final String tag = "KE,Junxing";
@@ -167,11 +167,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         iniListData();
         iniListAdapter();
 
-        iniSensor();
+
         initBluetoothAdapter();
 
         scanAction();
         connectAction();
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -190,6 +191,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         realm.close();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        Thread BISensorThread = new Thread(()->{
+            iniSensor();
+        });
+
+       BISensorThread.start();
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -316,9 +327,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         btnStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
-                mSensorManager.unregisterListener(MainActivity.this);
-
+                mSensorManager.unregisterListener(mSensorEventListener);
             }
         });
 
@@ -420,7 +429,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onPause() {
         super.onPause();
-        mSensorManager.unregisterListener(MainActivity.this);
+        mSensorManager.unregisterListener(mSensorEventListener);
     }
 
     private void iniSensor() {
@@ -430,51 +439,55 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         gyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         magnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-        mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(mSensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(mSensorEventListener, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(mSensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
 
     }
 
 
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        float[] values = event.values;
-        int sensorType = event.sensor.getType();
 
-        switch (sensorType) {
-            case Sensor.TYPE_GYROSCOPE:
-                gyro_x_TV.setText("gyro_x: " + values[0]);
-                gyro_y_TV.setText("gyro_y: " + values[1]);
-                gyro_z_TV.setText("gyro_z: " + values[2]);
-                sensorDataTemp[3] = values[0];
-                sensorDataTemp[4] = values[1];
-                sensorDataTemp[5] = values[2];
-                break;
+    SensorEventListener mSensorEventListener = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent sensorEvent) {
+            float[] values = sensorEvent.values;
+            int sensorType = sensorEvent.sensor.getType();
 
-            case Sensor.TYPE_ACCELEROMETER:
-                acc_x_TV.setText("x_Acc: " + values[0]);
-                acc_y_TV.setText("y_Acc: " + values[1]);
-                acc_z_TV.setText("z_Acc: " + values[2]);
-                sensorDataTemp[0] = values[0];
-                sensorDataTemp[1] = values[1];
-                sensorDataTemp[2] = values[2];
-                break;
-            case Sensor.TYPE_MAGNETIC_FIELD:
-                sensorDataTemp[6] = values[0];
-                sensorDataTemp[7] = values[1];
-                sensorDataTemp[8] = values[2];
-                break;
+            switch (sensorType) {
+                case Sensor.TYPE_GYROSCOPE:
+                    gyro_x_TV.setText("gyro_x: " + values[0]);
+                    gyro_y_TV.setText("gyro_y: " + values[1]);
+                    gyro_z_TV.setText("gyro_z: " + values[2]);
+                    sensorDataTemp[3] = values[0];
+                    sensorDataTemp[4] = values[1];
+                    sensorDataTemp[5] = values[2];
+                    break;
 
-            default:
-                break;
+                case Sensor.TYPE_ACCELEROMETER:
+                    acc_x_TV.setText("x_Acc: " + values[0]);
+                    acc_y_TV.setText("y_Acc: " + values[1]);
+                    acc_z_TV.setText("z_Acc: " + values[2]);
+                    sensorDataTemp[0] = values[0];
+                    sensorDataTemp[1] = values[1];
+                    sensorDataTemp[2] = values[2];
+                    break;
+                case Sensor.TYPE_MAGNETIC_FIELD:
+                    sensorDataTemp[6] = values[0];
+                    sensorDataTemp[7] = values[1];
+                    sensorDataTemp[8] = values[2];
+                    break;
+
+                default:
+                    break;
+            }
         }
-    }
 
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int i) {
 
-    }
+        }
+    };
+
 
 
     private void initBluetoothAdapter() {
