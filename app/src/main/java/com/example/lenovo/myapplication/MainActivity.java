@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothGattService;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -69,7 +70,8 @@ public class MainActivity extends AppCompatActivity   {
     private static final UUID configureBT_UUID = UUID.fromString("F000AA82-0451-4000-B000-000000000000");
     private static final UUID SetPeriod_UUID = UUID.fromString("F000AA83-0451-4000-B000-000000000000");
 
-
+    private Thread BISensorThread;
+    private Thread EXSensorThread;
 
     private SensorManager mSensorManager;
     private Sensor accelerometer;
@@ -109,6 +111,9 @@ public class MainActivity extends AppCompatActivity   {
     private boolean clickOnce = false;
 
 
+    private MediaPlayer dynamic_Player;
+    private MediaPlayer static_Player;
+
     private Realm realm;
 
     private Button btnNotify;
@@ -121,31 +126,63 @@ public class MainActivity extends AppCompatActivity   {
 
     private double[] sensorDataTemp = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     private double[][] rawData = {
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
     private double[][] averageValue = {
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
     private double[][] featureValue = {
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
 
     private String[] StringLable = {"Standing", "Lying", "Sitting"};
@@ -162,13 +199,13 @@ public class MainActivity extends AppCompatActivity   {
         iniDeleteDataAtDatabase();
 
         iniMainActivity();
-        btnSetOnClickListener();
-
+        iniMediaPlayer();
         iniListData();
         iniListAdapter();
-
-
         initBluetoothAdapter();
+
+
+        btnSetOnClickListener();
 
         scanAction();
         connectAction();
@@ -195,7 +232,7 @@ public class MainActivity extends AppCompatActivity   {
     protected void onResume() {
         super.onResume();
 
-        Thread BISensorThread = new Thread(()->{
+        BISensorThread = new Thread(()->{
             iniSensor();
         });
 
@@ -270,7 +307,13 @@ public class MainActivity extends AppCompatActivity   {
     }
 
 
+    private void iniMediaPlayer(){
+        dynamic_Player = MediaPlayer.create(this,R.raw.dynamic_gb_1);
+        static_Player = MediaPlayer.create(this,R.raw.static_gb_1);
+    }
+
     private void btnSetOnClickListener(){
+
         btnNotify.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -327,7 +370,9 @@ public class MainActivity extends AppCompatActivity   {
         btnStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
                 mSensorManager.unregisterListener(mSensorEventListener);
+                BISensorThread.interrupt();
             }
         });
 
@@ -374,11 +419,12 @@ public class MainActivity extends AppCompatActivity   {
             }
         });
 
-
-
         btnDetection.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
+
+
                 new Thread(new Runnable() {
 
                     @Override
@@ -386,6 +432,7 @@ public class MainActivity extends AppCompatActivity   {
 //                        Realm realm2 =Realm.getDefaultInstance();
 //                        long timeTemp = System.currentTimeMillis();
                         boolean result = false;
+
                         try {
 
                             while (true){
@@ -399,10 +446,11 @@ public class MainActivity extends AppCompatActivity   {
 
                                 if (result){
                                     activityStatus.setText("Static Postures");
+                                    static_Player.start();
                                     result = false;
                                 } else {
                                     activityStatus.setText("Dynamic Transitions");
-
+                                    dynamic_Player.start();
                                 }
 
 //                                Log.d(tag1,"----->" + timeTemp);
@@ -1059,6 +1107,24 @@ public class MainActivity extends AppCompatActivity   {
                 q_arr[i][0] = q_arrRead[16];
             } else if (i == 8) {
                 q_arr[i][0] = q_arrRead[17];
+            } else if (i == 9) {
+                q_arr[i][0] = q_arrRead[0];
+            } else if (i == 10) {
+                q_arr[i][0] = q_arrRead[1];
+            } else if (i == 11) {
+                q_arr[i][0] = q_arrRead[2];
+            } else if (i == 12) {
+                q_arr[i][0] = q_arrRead[3];
+            } else if (i == 13) {
+                q_arr[i][0] = q_arrRead[4];
+            } else if (i == 14) {
+                q_arr[i][0] = q_arrRead[5];
+            } else if (i == 15) {
+                q_arr[i][0] = q_arrRead[6];
+            } else if (i == 16) {
+                q_arr[i][0] = q_arrRead[7];
+            } else if (i == 17) {
+                q_arr[i][0] = q_arrRead[8];
             }
         }
         Log.d(tag,"---->pushStackRowData finish<----");
@@ -1119,8 +1185,8 @@ public class MainActivity extends AppCompatActivity   {
 
     private void calFeatureValue(double[][] q_arr) {
 
-        double[] arrys = {0,0,0,0,0,0,0,0,0};
-        double[] temp = {0,0,0};
+        double[] arrys = {0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0};
+        double[] temp = {0,0,0,0,0,0};
 
 
 
@@ -1131,6 +1197,12 @@ public class MainActivity extends AppCompatActivity   {
         temp[0] = calFeature(arrys[0],arrys[1],arrys[2]);
         temp[1] = calFeature(arrys[3],arrys[4],arrys[5]);
         temp[2] = calFeature(arrys[6],arrys[7],arrys[8]);
+
+        temp[3] = calFeature(arrys[9],arrys[10],arrys[11]);
+        temp[4] = calFeature(arrys[12],arrys[13],arrys[14]);
+        temp[5] = calFeature(arrys[15],arrys[16],arrys[17]);
+
+
 
         pushStackFeatureValue(temp,featureValue);
 
