@@ -113,6 +113,11 @@ public class MainActivity extends AppCompatActivity   {
 
     private MediaPlayer dynamic_Player;
     private MediaPlayer static_Player;
+    private MediaPlayer standing_Player;
+    private MediaPlayer sitting_Player;
+    private MediaPlayer lying_Player;
+    private MediaPlayer bend_Player;
+
 
     private Realm realm;
 
@@ -310,6 +315,10 @@ public class MainActivity extends AppCompatActivity   {
     private void iniMediaPlayer(){
         dynamic_Player = MediaPlayer.create(this,R.raw.dynamic_gb_1);
         static_Player = MediaPlayer.create(this,R.raw.static_gb_1);
+        standing_Player = MediaPlayer.create(this,R.raw.standing_gb_1);
+        sitting_Player = MediaPlayer.create(this,R.raw.sitting_gb_1);
+        lying_Player = MediaPlayer.create(this,R.raw.lying_gb_1);
+        bend_Player = MediaPlayer.create(this,R.raw.bend_gb_1);
     }
 
     private void btnSetOnClickListener(){
@@ -432,6 +441,7 @@ public class MainActivity extends AppCompatActivity   {
 //                        Realm realm2 =Realm.getDefaultInstance();
 //                        long timeTemp = System.currentTimeMillis();
                         boolean result = false;
+                        String posture = "";
 
                         try {
 
@@ -442,12 +452,27 @@ public class MainActivity extends AppCompatActivity   {
                                 calAverageValue(rawData);
                                 calFeatureValue(averageValue);
 
-                                result = fallDetection(featureValue);
+                                result = staticOrDynamicDetection(featureValue);
 
                                 if (result){
                                     activityStatus.setText("Static Postures");
-                                    static_Player.start();
+                                    posture = postureDetection(averageValue);
+
+                                    if(posture == "standing"){
+                                        standing_Player.start();
+                                    } else if (posture == "bending"){
+                                        bend_Player.start();
+                                    } else if (posture == "sitting"){
+                                        sitting_Player.start();
+                                    } else if (posture == "lying"){
+                                        lying_Player.start();
+                                    }
+
+//                                    static_Player.start();
                                     result = false;
+
+
+
                                 } else {
                                     activityStatus.setText("Dynamic Transitions");
                                     dynamic_Player.start();
@@ -770,7 +795,7 @@ public class MainActivity extends AppCompatActivity   {
 
 
     //Run successfully
-    private boolean readCharacteristicValue(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+    private void readCharacteristicValue(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
 
         boolean result = gatt.readCharacteristic(characteristic);
 
@@ -780,8 +805,6 @@ public class MainActivity extends AppCompatActivity   {
         } else {
             Log.d(tag, "readCharacteristic failure");
         }
-
-        return result;
 
     }
 
@@ -1219,7 +1242,6 @@ public class MainActivity extends AppCompatActivity   {
         return max;
     }
 
-
     private double minValue(double[] q_arrs){
         double min = q_arrs[0];
         for (int i = 0; i < q_arrs.length; i++) {
@@ -1230,21 +1252,60 @@ public class MainActivity extends AppCompatActivity   {
         return min;
     }
 
-    private boolean fallDetection(double[][] q_arr){
-        double A_max = maxValue(q_arr[0]);
-        double A_min = minValue(q_arr[0]);
-        double G_max = maxValue(q_arr[1]);
-        double G_min = minValue(q_arr[1]);
+    private boolean staticOrDynamicDetection(double[][] q_arr){
+        double A_max_EX = maxValue(q_arr[0]);
+        double A_min_EX = minValue(q_arr[0]);
+        double G_max_EX = maxValue(q_arr[1]);
+        double G_min_EX = minValue(q_arr[1]);
 
-        if (Math.abs(A_max - A_min) <= 3 && Math.abs(G_max - G_min) <= 60 ){
+        double A_max_BI = maxValue(q_arr[3]);
+        double A_min_BI = minValue(q_arr[3]);
+        double G_max_BI = maxValue(q_arr[4]);
+        double G_min_BI = minValue(q_arr[4]);
 
-            Log.d(tag,"Math.abs(A_max - A_min):" + Math.abs(A_max - A_min));
-            Log.d(tag,"Math.abs(G_max - G_min):" + Math.abs(G_max - G_min));
+        if (Math.abs(A_max_EX - A_min_EX) < 0.4 && Math.abs(G_max_EX - G_min_EX) < 60 && Math.abs(A_max_BI - A_min_BI) < 0.4 && Math.abs(G_max_BI - G_min_BI) < 60 ){
+
+
+            Log.d(tag,"Math.abs(A_max_EX - A_min_EX):" + Math.abs(A_max_EX - A_min_EX));
+            Log.d(tag,"Math.abs(G_max_EX - G_min_EX):" + Math.abs(G_max_EX - G_min_EX));
             return true;
         }
 
 
         return false;
+    }
+
+    private double calAngleOfBody(double acc){
+        double temp = 0;
+        double g = 0.97;
+
+        temp = Math.acos(acc/g);
+
+
+        return Math.toDegrees(temp);
+    }
+
+    private String postureDetection(double[][] q_arrs){
+        String result = "";
+        Log.d(tag,"angle_q_arrs[10][1]:"+ q_arrs[10][1] + "  " + "angle_q_arrs[0][1]:" + q_arrs[0][1]);
+
+        double angle_BI = calAngleOfBody(Math.abs(q_arrs[10][1]/10));
+        double angle_EX = calAngleOfBody(Math.abs(q_arrs[0][1]));
+
+
+
+        Log.d(tag,"angle_EX:"+ angle_EX + "  " + "angle_BI:" + angle_BI);
+
+        if(angle_EX < 35 && angle_BI < 35){
+            result = "standing";
+        } else if(angle_EX > 35 && angle_BI < 35){
+            result = "bending";
+        } else if(angle_EX < 35 && angle_BI > 35){
+            result = "sitting";
+        } else if(angle_EX > 35 && angle_BI > 35){
+            result = "lying";
+        }
+        return result;
     }
 
 
