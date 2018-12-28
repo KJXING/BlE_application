@@ -34,7 +34,10 @@ import android.bluetooth.BluetoothManager;
 import android.widget.Toast;
 
 
+import com.example.lenovo.myapplication.Model.AngleData;
+import com.example.lenovo.myapplication.Model.FeatureData;
 import com.example.lenovo.myapplication.Model.MentionData;
+import com.example.lenovo.myapplication.Model.SorDfeatureData;
 import com.example.lenovo.myapplication.Model.externalMention;
 import com.example.lenovo.myapplication.Model.buildInMention;
 
@@ -62,7 +65,8 @@ public class MainActivity extends AppCompatActivity   {
 
     private final String tag = "KE,Junxing";
     private final String tag1 = "realm:";
-
+    private String posture_realm = "";
+    private String posture = "";
 
     private static final UUID mentionNotify_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final UUID serviceBT_UUID = UUID.fromString("F000AA80-0451-4000-4000-000000000000");
@@ -72,6 +76,10 @@ public class MainActivity extends AppCompatActivity   {
 
     private Thread BISensorThread;
     private Thread EXSensorThread;
+    private Thread detectionThread;
+    private Thread dataProcessThread;
+    private Thread fallDataProcessThread;
+
 
     private SensorManager mSensorManager;
     private Sensor accelerometer;
@@ -106,10 +114,12 @@ public class MainActivity extends AppCompatActivity   {
     private TextView sensorTag_mag_z_TV;
 
     private boolean switch_notify = false;
-    private boolean switch_saveBI = false;
+    private boolean switch_BISensor = false;
     private boolean switch_saveEX = false;
+    private boolean switch_detection = false;
     private boolean clickOnce = false;
-
+    private boolean btConnectionStatus = false;
+    private boolean result_fall = false;
 
     private MediaPlayer dynamic_Player;
     private MediaPlayer static_Player;
@@ -117,6 +127,11 @@ public class MainActivity extends AppCompatActivity   {
     private MediaPlayer sitting_Player;
     private MediaPlayer lying_Player;
     private MediaPlayer bend_Player;
+    private MediaPlayer falling_Player;
+    private MediaPlayer running_Player;
+    private MediaPlayer walking_Player;
+    private MediaPlayer other_Player;
+
 
 
     private Realm realm;
@@ -128,6 +143,14 @@ public class MainActivity extends AppCompatActivity   {
     private Button btnSave;
     private Button btnExport;
     private Button btnDetection;
+
+    private double[] posture_q = {0,0};
+    private double R_A_BI_q;
+    private double R_A_EX_q;
+    private double R_W_BI_q;
+    private double R_W_EX_q;
+
+
 
     private double[] sensorDataTemp = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     private double[][] rawData = {
@@ -189,8 +212,14 @@ public class MainActivity extends AppCompatActivity   {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     };
+    private double[][] featureValueForFallDec = {
+            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 
-    private String[] StringLable = {"Standing", "Lying", "Sitting"};
+            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+            {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+    };
+
     private ListView mListView;
     private List<BluetoothDevice> mStringList;
     private ListAdapter mListAdapter;
@@ -201,7 +230,7 @@ public class MainActivity extends AppCompatActivity   {
         setContentView(R.layout.activity_main);
         realm = Realm.getDefaultInstance();
 
-        iniDeleteDataAtDatabase();
+
 
         iniMainActivity();
         iniMediaPlayer();
@@ -237,16 +266,120 @@ public class MainActivity extends AppCompatActivity   {
     protected void onResume() {
         super.onResume();
 
-        BISensorThread = new Thread(()->{
-            iniSensor();
-        });
+        iniThread();
 
-       BISensorThread.start();
+        BISensorThread.start();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+    private void iniThread(){
+
+        dataProcessThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (true){
+                        pushStackRowData(rawData,sensorDataTemp);
+                        calAverageValue(rawData);
+                        calFeatureValue(averageValue);
+                        Thread.sleep(90);
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        });
+
+        fallDataProcessThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+
+                    while (true){
+
+                        AccGyroPushStackFeatureValue(rawData);
+                        Thread.sleep(70);
+                    }
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        detectionThread =  new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                boolean result = false;
+                String dynamicStatus;
+
+                try {
+
+                    while (true){
+
+                        result = staticOrDynamicDetection(rawData);
+                        posture = postureDetection(averageValue);
+                        result_fall = fallDetection(featureValueForFallDec);
+                        if (result){
+                            activityStatus.setText("Static Postures");
+
+                            if(posture == "standing"){
+                                standing_Player.start();
+                            } else if (posture == "bending"){
+                                bend_Player.start();
+                            } else if (posture == "sitting"){
+                                sitting_Player.start();
+                            } else if (posture == "lying" && !result_fall ){
+                                lying_Player.start();
+                            } else if (posture == "lying" && result_fall){
+                                falling_Player.start();
+                            }
+                            posture_realm = posture;
+                        } else {
+                            activityStatus.setText("Dynamic Transitions");
+                            dynamicStatus = dynamicDetection(featureValueForFallDec);
+
+                            if (posture == "lying" && result_fall){
+                                falling_Player.start();
+                            } else if (posture == "standing" && dynamicStatus == "walking"){
+                                walking_Player.start();
+                            } else if (posture == "standing" && dynamicStatus == "running"){
+                                running_Player.start();
+                            } else {
+//                                dynamic_Player.start();
+                            }
+
+                            posture_realm = dynamicStatus;
+
+
+                        }
+
+
+
+                        Thread.sleep(75);
+                    }
+
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        });
+
+        BISensorThread = new Thread(()->{
+            iniSensor();
+        });
+
+
+
+
+
     }
 
     private void iniMainActivity() {
@@ -311,7 +444,6 @@ public class MainActivity extends AppCompatActivity   {
 
     }
 
-
     private void iniMediaPlayer(){
         dynamic_Player = MediaPlayer.create(this,R.raw.dynamic_gb_1);
         static_Player = MediaPlayer.create(this,R.raw.static_gb_1);
@@ -319,6 +451,10 @@ public class MainActivity extends AppCompatActivity   {
         sitting_Player = MediaPlayer.create(this,R.raw.sitting_gb_1);
         lying_Player = MediaPlayer.create(this,R.raw.lying_gb_1);
         bend_Player = MediaPlayer.create(this,R.raw.bend_gb_1);
+        falling_Player = MediaPlayer.create(this,R.raw.falling_gb_1);
+        running_Player = MediaPlayer.create(this,R.raw.running_gb_1);
+        walking_Player = MediaPlayer.create(this,R.raw.walking_gb_1);
+        other_Player = MediaPlayer.create(this,R.raw.other_gb_1);
     }
 
     private void btnSetOnClickListener(){
@@ -365,6 +501,7 @@ public class MainActivity extends AppCompatActivity   {
                     while (true){
                         try {
                             readCharacteristicValue(mBluetoothGatt, mentionCharacteristic);
+                            Log.d(tag,"sensorDataTemp:"+ Arrays.toString(sensorDataTemp));
                             Thread.sleep(90);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
@@ -372,7 +509,7 @@ public class MainActivity extends AppCompatActivity   {
 
                     }
                 }).start();
-
+                btConnectionStatus = true;
             }
         });
 
@@ -380,14 +517,34 @@ public class MainActivity extends AppCompatActivity   {
             @Override
             public void onClick(View view) {
 
-                mSensorManager.unregisterListener(mSensorEventListener);
-                BISensorThread.interrupt();
+                if(!switch_BISensor){
+                    mSensorManager.unregisterListener(mSensorEventListener);
+                    switch_BISensor = true;
+                    iniDeleteDataAtDatabase();
+
+                    Toast.makeText(MainActivity.this, "delete successfully", Toast.LENGTH_SHORT).show();
+
+
+                } else {
+                    mSensorManager.registerListener(mSensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+                    mSensorManager.registerListener(mSensorEventListener, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+                    mSensorManager.registerListener(mSensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
+                    switch_BISensor = false;
+                    Toast.makeText(MainActivity.this, "mSensorManager successfully", Toast.LENGTH_SHORT).show();
+                }
+
+
             }
         });
 
         btnExport.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (!btConnectionStatus) {
+                    Toast.makeText(MainActivity.this, "Please make sure connection is Ready", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 Toast.makeText(MainActivity.this, "Onclick btnExport", Toast.LENGTH_SHORT).show();
                 exportRealmFile();
 
@@ -397,6 +554,10 @@ public class MainActivity extends AppCompatActivity   {
         btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (!btConnectionStatus) {
+                    Toast.makeText(MainActivity.this, "Please make sure connection is Ready", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 new Thread(new Runnable() {
                     @Override
@@ -405,9 +566,10 @@ public class MainActivity extends AppCompatActivity   {
                         try {
 
                             while (true){
-                                saveExternalMentionData(realm1,System.currentTimeMillis(),sensorDataTemp[9],sensorDataTemp[10],sensorDataTemp[11],sensorDataTemp[12],sensorDataTemp[13],sensorDataTemp[14],sensorDataTemp[15],sensorDataTemp[16],sensorDataTemp[17],StringLable[1]);
-
-                                Thread.sleep(90);
+                                saveFeatureValue(realm1,System.currentTimeMillis(),featureValue[3][0],featureValue[0][0],featureValue[4][0],featureValue[1][0],posture_realm);
+                                saveAngleData(realm1,System.currentTimeMillis(),posture_q[0],posture_q[1],posture);
+                                saveSorDFeatureData(realm1,System.currentTimeMillis(),featureValueForFallDec[2][0],featureValueForFallDec[0][0],featureValueForFallDec[3][0],featureValueForFallDec[1][0],Boolean.toString(result_fall));
+                                Thread.sleep(29);
                             }
 
                         } catch (InterruptedException e) {
@@ -420,81 +582,26 @@ public class MainActivity extends AppCompatActivity   {
                     }
                 }).start();
 
-//                    saveExternalMentionData(System.currentTimeMillis(), sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[2]);
-//                    saveToDatabase(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], sensorDataTemp[9], sensorDataTemp[10], sensorDataTemp[11], sensorDataTemp[12], sensorDataTemp[13], sensorDataTemp[14], sensorDataTemp[15], sensorDataTemp[16], sensorDataTemp[17], StringLable[0]);
-
-//            saveBuildInMentionData(System.currentTimeMillis(), sensorDataTemp[0], sensorDataTemp[1], sensorDataTemp[2], sensorDataTemp[3], sensorDataTemp[4], sensorDataTemp[5], sensorDataTemp[6], sensorDataTemp[7], sensorDataTemp[8], StringLable[1]);
-
             }
         });
 
         btnDetection.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (!btConnectionStatus) {
+                    Toast.makeText(MainActivity.this, "Please make sure connection is Ready", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
+                dataProcessThread.start();
+                fallDataProcessThread.start();
 
+                if(!switch_detection){
+                    detectionThread.start();
+                    switch_detection = true;
+                    return;
+                }
 
-                new Thread(new Runnable() {
-
-                    @Override
-                    public void run() {
-//                        Realm realm2 =Realm.getDefaultInstance();
-//                        long timeTemp = System.currentTimeMillis();
-                        boolean result = false;
-                        String posture = "";
-
-                        try {
-
-                            while (true){
-
-//                                RealmQuery<externalMention> query = realm2.where(externalMention.class);
-                                pushStackRowData(rawData,sensorDataTemp);
-                                calAverageValue(rawData);
-                                calFeatureValue(averageValue);
-
-                                result = staticOrDynamicDetection(featureValue);
-
-                                if (result){
-                                    activityStatus.setText("Static Postures");
-                                    posture = postureDetection(averageValue);
-
-                                    if(posture == "standing"){
-                                        standing_Player.start();
-                                    } else if (posture == "bending"){
-                                        bend_Player.start();
-                                    } else if (posture == "sitting"){
-                                        sitting_Player.start();
-                                    } else if (posture == "lying"){
-                                        lying_Player.start();
-                                    }
-
-//                                    static_Player.start();
-                                    result = false;
-
-
-
-                                } else {
-                                    activityStatus.setText("Dynamic Transitions");
-                                    dynamic_Player.start();
-                                }
-
-//                                Log.d(tag1,"----->" + timeTemp);
-//
-////                                query.between("timestamp",timeTemp-1000,timeTemp);
-//                                query.greaterThanOrEqualTo("timestamp",timeTemp-1000);
-//                                RealmResults<externalMention> results = query.findAll();
-//
-//                                Log.d(tag1,"----->" + results);
-//                                timeTemp = timeTemp + 100;
-                                Thread.sleep(100);
-                            }
-
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-
-                    }
-                }).start();
             }
         });
     }
@@ -512,13 +619,11 @@ public class MainActivity extends AppCompatActivity   {
         gyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         magnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-        mSensorManager.registerListener(mSensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(mSensorEventListener, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(mSensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(mSensorEventListener, accelerometer, SensorManager.SENSOR_DELAY_UI);
+        mSensorManager.registerListener(mSensorEventListener, gyroscope, SensorManager.SENSOR_DELAY_UI);
+        mSensorManager.registerListener(mSensorEventListener, magnetometer, SensorManager.SENSOR_DELAY_UI);
 
     }
-
-
 
     SensorEventListener mSensorEventListener = new SensorEventListener() {
         @Override
@@ -528,12 +633,12 @@ public class MainActivity extends AppCompatActivity   {
 
             switch (sensorType) {
                 case Sensor.TYPE_GYROSCOPE:
-                    gyro_x_TV.setText("gyro_x: " + values[0]);
-                    gyro_y_TV.setText("gyro_y: " + values[1]);
-                    gyro_z_TV.setText("gyro_z: " + values[2]);
-                    sensorDataTemp[3] = values[0];
-                    sensorDataTemp[4] = values[1];
-                    sensorDataTemp[5] = values[2];
+                    gyro_x_TV.setText("gyro_x: " + Math.toDegrees(values[0]));
+                    gyro_y_TV.setText("gyro_y: " + Math.toDegrees(values[1]));
+                    gyro_z_TV.setText("gyro_z: " + Math.toDegrees(values[2]));
+                    sensorDataTemp[3] = Math.toDegrees(values[0]);
+                    sensorDataTemp[4] = Math.toDegrees(values[1]);
+                    sensorDataTemp[5] = Math.toDegrees(values[2]);
                     break;
 
                 case Sensor.TYPE_ACCELEROMETER:
@@ -560,8 +665,6 @@ public class MainActivity extends AppCompatActivity   {
 
         }
     };
-
-
 
     private void initBluetoothAdapter() {
         final BluetoothManager mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -848,7 +951,7 @@ public class MainActivity extends AppCompatActivity   {
 
     private void SetPeriod(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
 
-        characteristic.setValue(new byte[]{(byte)0x0A});
+        characteristic.setValue(new byte[]{(byte)0x0a});
 
         boolean result = gatt.writeCharacteristic(characteristic);
 
@@ -966,9 +1069,9 @@ public class MainActivity extends AppCompatActivity   {
             value_mag = sensorConvert.magConvert(value);
 
 
-            sensorDataTemp[9] = value_acc.x;
-            sensorDataTemp[10] = value_acc.y;
-            sensorDataTemp[11] = value_acc.z;
+            sensorDataTemp[9] = value_acc.x * 10;
+            sensorDataTemp[10] = value_acc.y * 10;
+            sensorDataTemp[11] = value_acc.z * 10;
             sensorDataTemp[12] = value_gyro.x;
             sensorDataTemp[13] = value_gyro.y;
             sensorDataTemp[14] = value_gyro.z;
@@ -976,9 +1079,9 @@ public class MainActivity extends AppCompatActivity   {
             sensorDataTemp[16] = value_mag.y;
             sensorDataTemp[17] = value_mag.z;
 
-            sensorTag_acc_x_TV.setText("x_Acc: " + Double.toString(value_acc.x));
-            sensorTag_acc_y_TV.setText("y_Acc: " + Double.toString(value_acc.y));
-            sensorTag_acc_z_TV.setText("z_Acc: " + Double.toString(value_acc.z));
+            sensorTag_acc_x_TV.setText("x_Acc: " + Double.toString(sensorDataTemp[9]));
+            sensorTag_acc_y_TV.setText("y_Acc: " + Double.toString(sensorDataTemp[10]));
+            sensorTag_acc_z_TV.setText("z_Acc: " + Double.toString(sensorDataTemp[11]));
             sensorTag_gyro_x_TV.setText("x_Gyro: " + Double.toString(value_gyro.x));
             sensorTag_gyro_y_TV.setText("y_Gyro: " + Double.toString(value_gyro.y));
             sensorTag_gyro_z_TV.setText("z_Gyro: " + Double.toString(value_gyro.z));
@@ -1086,10 +1189,60 @@ public class MainActivity extends AppCompatActivity   {
         });
     }
 
+    private void saveFeatureValue(Realm realm, long q_time, final double q_a_bi, final double q_a_ex,final double q_w_bi,final double q_w_ex, String q_lable){
+        realm.executeTransaction(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                FeatureData featureData = realm.createObject(FeatureData.class);
+
+                featureData.setTimestamp(q_time);
+                featureData.setR_A_BI(q_a_bi);
+                featureData.setR_A_EX(q_a_ex);
+                featureData.setR_W_BI(q_w_bi);
+                featureData.setR_W_EX(q_w_ex);
+                featureData.setStatus(q_lable);
+
+                Log.d(tag,"---->saveFeatureData successfully<-----");
+            }
+        });
+    }
+
+    private void saveAngleData(Realm realm,long q_time, final double q_angle_BI, final double q_angle_EX, String q_lable){
+        realm.executeTransaction(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                AngleData angleData = realm.createObject(AngleData.class);
+                angleData.setTimestamp(q_time);
+                angleData.setAngle_BI(q_angle_BI);
+                angleData.setAngle_EX(q_angle_EX);
+                angleData.setStatus(q_lable);
+                Log.d(tag,"---->saveAngleData successfully<-----");
+            }
+        });
+    }
+
+    private void saveSorDFeatureData(Realm realm, long q_time, final double q_Dvalue_A_BI,final double q_Dvalue_A_EX,final double q_Dvalue_W_BI,final double q_Dvalue_W_EX, String q_lable){
+        realm.executeTransaction(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                SorDfeatureData sorDfeatureData = realm.createObject(SorDfeatureData.class);
+
+                sorDfeatureData.setTimestamp(q_time);
+                sorDfeatureData.setDValue_A_BI(q_Dvalue_A_BI);
+                sorDfeatureData.setDValue_A_EX(q_Dvalue_A_EX);
+                sorDfeatureData.setDValue_W_BI(q_Dvalue_W_BI);
+                sorDfeatureData.setDValue_W_EX(q_Dvalue_W_EX);
+                sorDfeatureData.setStatus(q_lable);
+                Log.d(tag,"---->saveSorDFeatureData successfully<-----");
+
+            }
+        });
+    }
+
     private void exportRealmFile() {
         Realm realm = Realm.getDefaultInstance();
         Log.d(tag,"------->Start exportRealmFile<--------");
-        final File file = new File(Environment.getExternalStorageDirectory().getPath().concat("/sample.realm"));
+        final File file = new File(Environment.getExternalStorageDirectory().getPath().concat("/sample_"+ System.currentTimeMillis() + ".realm"));
         if (file.exists()) {
             file.delete();
         }
@@ -1105,6 +1258,10 @@ public class MainActivity extends AppCompatActivity   {
                 realm.delete(MentionData.class);
                 realm.delete(externalMention.class);
                 realm.delete(buildInMention.class);
+
+                realm.delete(FeatureData.class);
+                realm.delete(AngleData.class);
+                realm.delete(SorDfeatureData.class);
             }
         });
     }
@@ -1167,6 +1324,27 @@ public class MainActivity extends AppCompatActivity   {
             q_arrWrite[i][0] = q_arrRead[i];
         }
 
+    }
+
+    private void AccGyroPushStackFeatureValue(double[][] q_arr){
+        moveStack(featureValueForFallDec);
+
+
+        double temp[] = {0,0,0,0};
+        //EX
+        temp[0] = calFeature(q_arr[0][0],q_arr[1][0],q_arr[2][0]);
+        temp[1] = calFeature(q_arr[3][0],q_arr[4][0],q_arr[5][0]);
+
+        //BI
+        temp[2] = calFeature(q_arr[9][0],q_arr[10][0],q_arr[11][0]);
+        temp[3] = calFeature(q_arr[12][0],q_arr[13][0],q_arr[14][0]);
+
+        featureValueForFallDec[0][0] = temp[0];
+        featureValueForFallDec[1][0] = temp[1];
+        featureValueForFallDec[2][0] = temp[2];
+        featureValueForFallDec[3][0] = temp[3];
+
+        Log.d(tag,"--->AccGyroPushStackFeatureValue successfully<-----");
     }
 
     private void moveStack(double[][] q_arr) {
@@ -1252,32 +1430,54 @@ public class MainActivity extends AppCompatActivity   {
         return min;
     }
 
+    private double minValue(double[] q_arrs, int t){
+        double min = q_arrs[0];
+        for (int i = 0; i < t; i++) {
+            if (q_arrs[i] < min){
+                min = q_arrs[i];
+            }
+        }
+        return min;
+    }
+
+    private double maxValue(double[] q_arrs, int t){
+        double max = q_arrs[0];
+        for (int i = 0; i < t; i++) {
+            if (q_arrs[i] > max){
+                max = q_arrs[i];
+            }
+        }
+        return max;
+    }
+
     private boolean staticOrDynamicDetection(double[][] q_arr){
-        double A_max_EX = maxValue(q_arr[0]);
-        double A_min_EX = minValue(q_arr[0]);
-        double G_max_EX = maxValue(q_arr[1]);
-        double G_min_EX = minValue(q_arr[1]);
+        double Gap_A_BI = maxValue(q_arr[3]) -  minValue(q_arr[3]);
+        double Gap_A_EX = maxValue(q_arr[0]) -  minValue(q_arr[0]);
+        double Gap_W_BI = maxValue(q_arr[4]) -  minValue(q_arr[4]);
+        double Gap_W_EX = maxValue(q_arr[1]) -  minValue(q_arr[1]);
 
-        double A_max_BI = maxValue(q_arr[3]);
-        double A_min_BI = minValue(q_arr[3]);
-        double G_max_BI = maxValue(q_arr[4]);
-        double G_min_BI = minValue(q_arr[4]);
+        double T_Acc_DandS = 0.4;
+        double T_Gyro_DandS = 60;
 
-        if (Math.abs(A_max_EX - A_min_EX) < 0.4 && Math.abs(G_max_EX - G_min_EX) < 60 && Math.abs(A_max_BI - A_min_BI) < 0.4 && Math.abs(G_max_BI - G_min_BI) < 60 ){
-
-
-            Log.d(tag,"Math.abs(A_max_EX - A_min_EX):" + Math.abs(A_max_EX - A_min_EX));
-            Log.d(tag,"Math.abs(G_max_EX - G_min_EX):" + Math.abs(G_max_EX - G_min_EX));
+        if(Gap_A_BI > T_Acc_DandS && Gap_A_EX > T_Acc_DandS && Gap_W_BI > T_Gyro_DandS && Gap_W_EX > T_Gyro_DandS){
+            Log.d(tag,"Gap_A_BI:" + Gap_A_BI + "  " + "Gap_A_EX:" + Gap_A_EX + "  " + "Gap_W_BI:" + Gap_W_BI + "  " + "Gap_W_EX:" + Gap_W_EX);
             return true;
         }
-
 
         return false;
     }
 
     private double calAngleOfBody(double acc){
         double temp = 0;
-        double g = 0.97;
+        double g = 9.8;
+
+        if(acc/g > 1){
+            return Math.toDegrees(Math.acos(1));
+        }
+
+        if(acc/g < -1){
+            return Math.toDegrees(Math.acos(-1));
+        }
 
         temp = Math.acos(acc/g);
 
@@ -1286,28 +1486,84 @@ public class MainActivity extends AppCompatActivity   {
     }
 
     private String postureDetection(double[][] q_arrs){
+        //parameters
+        double T_angle_low = 40;
+        double T_angle_high = 60;
+
         String result = "";
         Log.d(tag,"angle_q_arrs[10][1]:"+ q_arrs[10][1] + "  " + "angle_q_arrs[0][1]:" + q_arrs[0][1]);
 
-        double angle_BI = calAngleOfBody(Math.abs(q_arrs[10][1]/10));
-        double angle_EX = calAngleOfBody(Math.abs(q_arrs[0][1]));
+        double angle_BI = calAngleOfBody(q_arrs[10][1]);
+        double angle_EX = calAngleOfBody(q_arrs[0][1]);
 
-
+        posture_q[0] = angle_BI;
+        posture_q[1] = angle_EX;
 
         Log.d(tag,"angle_EX:"+ angle_EX + "  " + "angle_BI:" + angle_BI);
 
-        if(angle_EX < 35 && angle_BI < 35){
+        if(angle_EX < T_angle_low && angle_BI < T_angle_low){
             result = "standing";
-        } else if(angle_EX > 35 && angle_BI < 35){
+        } else if(angle_EX > T_angle_high && angle_BI < T_angle_low){
             result = "bending";
-        } else if(angle_EX < 35 && angle_BI > 35){
+        } else if(angle_EX < T_angle_low && angle_BI > T_angle_high){
             result = "sitting";
-        } else if(angle_EX > 35 && angle_BI > 35){
+        } else if(angle_EX > T_angle_high && angle_BI > T_angle_high){
             result = "lying";
         }
         return result;
     }
 
+    private String dynamicDetection(double[][] q_arrs){
+
+        double D_A_BI = maxValue(q_arrs[2],10) - minValue(q_arrs[2],10);
+        double D_A_EX = maxValue(q_arrs[0],10) - minValue(q_arrs[2],10);
+        double D_W_BI = maxValue(q_arrs[3],10) - minValue(q_arrs[2],10);
+        double D_W_EX = maxValue(q_arrs[1],10) - minValue(q_arrs[2],10);
+
+        double T_A_BI_walking = 3;
+        double T_A_EX_walking = 1.5;
+        double T_W_BI_walking = 30;
+        double T_W_EX_walking = 15;
+
+        double T_A_BI_running = 15;
+        double T_A_EX_running = 12;
+        double T_W_BI_running = 150;
+        double T_W_EX_running = 80;
+
+        if (D_A_BI > T_A_BI_walking && D_A_BI < T_A_BI_running &&
+                D_A_EX > T_A_EX_walking && D_A_EX < T_A_EX_running &&
+                D_W_BI > T_W_BI_walking && D_W_BI < T_W_BI_running &&
+                D_W_EX > T_W_EX_walking && D_W_EX < T_W_EX_running){
+            return "walking";
+        } else if (D_A_BI > T_A_BI_running && D_A_EX > T_A_EX_running && D_W_BI >T_W_BI_running && D_W_EX > T_W_EX_running){
+            return "running";
+        } else {
+            return "other";
+        }
+
+    }
+
+    private boolean fallDetection(double[][] q_arrs){
+
+        double T_A_BI = 16;
+        double T_A_EX = 16;
+        double T_W_BI = 160;
+        double T_W_EX = 150;
+
+        double R_A_BI = maxValue(q_arrs[2]) - minValue(q_arrs[2]);
+        double R_A_EX = maxValue(q_arrs[0]) - minValue(q_arrs[0]);
+        double R_W_BI = maxValue(q_arrs[3]) - minValue(q_arrs[3]);
+        double R_W_EX = maxValue(q_arrs[1]) - minValue(q_arrs[1]);
+
+        Log.d(tag,"R_A_BI:" + R_A_BI + "R_A_EX:" + R_A_EX +"R_W_BI:" + R_W_BI +"R_W_EX:" + R_W_EX);
+
+        if (R_A_BI > T_A_BI && R_A_EX > T_A_EX && R_W_BI > T_W_BI && R_W_EX >T_W_EX){
+
+            return true;
+        }
+
+        return false;
+    }
 
 
     private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener
@@ -1362,9 +1618,6 @@ public class MainActivity extends AppCompatActivity   {
             return false;
         }
     };
-
-
-
 
 }
 
