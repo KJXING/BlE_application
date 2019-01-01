@@ -285,8 +285,8 @@ public class MainActivity extends AppCompatActivity   {
                     while (true){
                         pushStackRowData(rawData,sensorDataTemp);
                         calAverageValue(rawData);
-                        calFeatureValue(averageValue);
-                        Thread.sleep(90);
+                        calFeatureValue(rawData);
+                        Thread.sleep(85);
                     }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -323,9 +323,12 @@ public class MainActivity extends AppCompatActivity   {
 
                     while (true){
 
-                        result = staticOrDynamicDetection(rawData);
-                        posture = postureDetection(averageValue);
+                        result = staticOrDynamicDetection(featureValue);
+                        posture = postureDetection(rawData);
                         result_fall = fallDetection(featureValueForFallDec);
+
+
+                        Log.d(tag,"static:"+ result);
                         if (result){
                             activityStatus.setText("Static Postures");
 
@@ -375,10 +378,6 @@ public class MainActivity extends AppCompatActivity   {
         BISensorThread = new Thread(()->{
             iniSensor();
         });
-
-
-
-
 
     }
 
@@ -1456,11 +1455,11 @@ public class MainActivity extends AppCompatActivity   {
         double Gap_W_BI = maxValue(q_arr[4]) -  minValue(q_arr[4]);
         double Gap_W_EX = maxValue(q_arr[1]) -  minValue(q_arr[1]);
 
-        double T_Acc_DandS = 0.4;
+        double T_Acc_DandS = 0.5;
         double T_Gyro_DandS = 60;
+        Log.d(tag,"Gap_A_BI:" + Gap_A_BI + "  " + "Gap_A_EX:" + Gap_A_EX + "  " + "Gap_W_BI:" + Gap_W_BI + "  " + "Gap_W_EX:" + Gap_W_EX);
 
-        if(Gap_A_BI > T_Acc_DandS && Gap_A_EX > T_Acc_DandS && Gap_W_BI > T_Gyro_DandS && Gap_W_EX > T_Gyro_DandS){
-            Log.d(tag,"Gap_A_BI:" + Gap_A_BI + "  " + "Gap_A_EX:" + Gap_A_EX + "  " + "Gap_W_BI:" + Gap_W_BI + "  " + "Gap_W_EX:" + Gap_W_EX);
+        if(Gap_A_BI < T_Acc_DandS && Gap_A_EX < T_Acc_DandS && Gap_W_BI < T_Gyro_DandS && Gap_W_EX < T_Gyro_DandS){
             return true;
         }
 
@@ -1545,10 +1544,16 @@ public class MainActivity extends AppCompatActivity   {
 
     private boolean fallDetection(double[][] q_arrs){
 
-        double T_A_BI = 16;
+        double T_A_BI = 14;
         double T_A_EX = 16;
         double T_W_BI = 160;
         double T_W_EX = 150;
+
+        double T_S_W_sum = 600;
+        double T_S_W_sub = 150;
+        double T_S_A_sum = 45;
+        double T_S_A_min = 15;
+
 
         double R_A_BI = maxValue(q_arrs[2]) - minValue(q_arrs[2]);
         double R_A_EX = maxValue(q_arrs[0]) - minValue(q_arrs[0]);
@@ -1558,7 +1563,10 @@ public class MainActivity extends AppCompatActivity   {
         Log.d(tag,"R_A_BI:" + R_A_BI + "R_A_EX:" + R_A_EX +"R_W_BI:" + R_W_BI +"R_W_EX:" + R_W_EX);
 
         if (R_A_BI > T_A_BI && R_A_EX > T_A_EX && R_W_BI > T_W_BI && R_W_EX >T_W_EX){
+            return true;
+        }
 
+        if ((R_A_BI + R_A_EX)>T_S_A_sum && R_A_BI > T_S_A_min && (R_W_BI+R_W_EX)>T_S_W_sum && Math.abs(R_W_BI-R_A_EX)<T_S_W_sub){
             return true;
         }
 
